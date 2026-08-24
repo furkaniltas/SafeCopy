@@ -5,7 +5,7 @@
 # Phase 0 — Product, Security and Architecture Decisions
 
 - [x] Product name `Eksim SafeCopy` finalized
-- [x] No `Perde` references found in repository
+- [x] No legacy product name references found in repository
 - [x] Product purpose documented
 - [x] Windows 11 target confirmed
 - [x] Fully local operation model confirmed
@@ -1017,7 +1017,7 @@ Preserve existing user changes.
 
 Create/update `AGENTS.md` and `DEVELOPMENT_CHECKLIST.md`.
 
-Verify product name is NOT `Perde` anywhere in repository.
+Verify product name is `Eksim SafeCopy` everywhere in repository.
 
 Then apply Phase 0.
 

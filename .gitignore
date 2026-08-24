@@ -1,0 +1,63 @@
+# Build outputs
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# User documents (never commit real PII)
+**/Documents/
+**/Desktop/
+**/Downloads/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Local secrets
+*.local.config
+*.secrets.json
+appsettings.*.json
+!appsettings.json
+
+# Logs
+*.log
+logs/
+
+# ReSharper
+_ReSharper*/
+*.resharper
+
+# DotCover
+*.dcvr
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
