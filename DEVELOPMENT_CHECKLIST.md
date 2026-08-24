@@ -39,13 +39,13 @@
 - [x] `EksimSafeCopy.Infrastructure`
 - [x] Test projects
 - [x] Project references
-- [ ] Core layer WPF/file-system/Windows API independence
-- [ ] Dependency Injection
-- [ ] Interface/implementation separation
-- [ ] Configuration abstraction
-- [ ] Cancellation/timeout model
-- [ ] Error model
-- [ ] Basic test infrastructure
+- [x] Core layer WPF/file-system/Windows API independence
+- [x] Dependency Injection
+- [x] Interface/implementation separation
+- [x] Configuration abstraction
+- [x] Cancellation/timeout model
+- [x] Error model
+- [x] Basic test infrastructure
 - [x] First clean build
 - [x] First test run
 

@@ -6,6 +6,8 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>1591;CA1416</NoWarn>
+    <SupportedPlatform>windows</SupportedPlatform>
   </PropertyGroup>
 
   <ItemGroup>
