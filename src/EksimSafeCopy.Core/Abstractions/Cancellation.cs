@@ -7,26 +7,14 @@ public interface IOperationContext
     CancellationToken CancellationToken { get; }
     TimeSpan? Timeout { get; }
     IReadOnlyDictionary<string, object> Properties { get; }
-    ILogger Logger { get; }
+    IOperationCallback? Callback { get; }
 }
 
-public interface ILogger
+public interface IOperationCallback
 {
-    void Log(LogLevel level, string message, params object[] args);
-    void Log(LogLevel level, Exception exception, string message, params object[] args);
-    bool IsEnabled(LogLevel level);
-    IDisposable BeginScope(string name, params object[] args);
-}
-
-public enum LogLevel
-{
-    Trace = 0,
-    Debug = 1,
-    Information = 2,
-    Warning = 3,
-    Error = 4,
-    Critical = 5,
-    None = 6
+    void ReportProgress(double percent, string? message = null);
+    void ReportWarning(string message);
+    void ReportError(string message);
 }
 
 public static class CancellationTokenExtensions
@@ -81,52 +69,33 @@ public sealed class OperationContext : IOperationContext
     public CancellationToken CancellationToken { get; }
     public TimeSpan? Timeout { get; }
     public IReadOnlyDictionary<string, object> Properties { get; }
-    public ILogger Logger { get; }
+    public IOperationCallback? Callback { get; }
     
     public OperationContext(
         CancellationToken cancellationToken = default,
         TimeSpan? timeout = null,
-        ILogger? logger = null,
+        IOperationCallback? callback = null,
         IReadOnlyDictionary<string, object>? properties = null)
     {
         CancellationToken = cancellationToken;
         Timeout = timeout;
-        Logger = logger ?? NullLogger.Instance;
+        Callback = callback;
         Properties = properties ?? new Dictionary<string, object>();
     }
     
     public OperationContext WithCancellation(CancellationToken token)
-        => new(token, Timeout, Logger, Properties);
+        => new(token, Timeout, Callback, Properties);
     
     public OperationContext WithTimeout(TimeSpan timeout)
-        => new(CancellationToken, timeout, Logger, Properties);
+        => new(CancellationToken, timeout, Callback, Properties);
     
-    public OperationContext WithLogger(ILogger logger)
-        => new(CancellationToken, Timeout, logger, Properties);
+    public OperationContext WithCallback(IOperationCallback? callback)
+        => new(CancellationToken, Timeout, callback, Properties);
     
     public OperationContext WithProperty(string key, object value)
     {
         var props = new Dictionary<string, object>(Properties) { [key] = value };
-        return new(CancellationToken, Timeout, Logger, props);
-    }
-}
-
-public sealed class NullLogger : ILogger
-{
-    public static NullLogger Instance { get; } = new();
-    
-    private NullLogger() { }
-    
-    public void Log(LogLevel level, string message, params object[] args) { }
-    public void Log(LogLevel level, Exception exception, string message, params object[] args) { }
-    public bool IsEnabled(LogLevel level) => false;
-    public IDisposable BeginScope(string name, params object[] args) => NullScope.Instance;
-    
-    private sealed class NullScope : IDisposable
-    {
-        public static NullScope Instance { get; } = new();
-        private NullScope() { }
-        public void Dispose() { }
+        return new(CancellationToken, Timeout, Callback, props);
     }
 }
 

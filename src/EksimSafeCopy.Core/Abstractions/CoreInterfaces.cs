@@ -1,6 +1,8 @@
 namespace EksimSafeCopy.Core.Abstractions;
 
 using EksimSafeCopy.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 public interface IDocumentEngine
 {
@@ -68,6 +70,12 @@ public interface IVerificationEngine
     Result<VerificationResult> Verify(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default);
     Task<Result<VerificationResult>> VerifyAsync(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default);
 }
+
+// Use Microsoft.Extensions.DependencyInjection abstractions
+// IServiceCollection, IServiceProvider, ServiceDescriptor, ServiceLifetime
+
+// Use Microsoft.Extensions.Configuration abstractions
+// IConfiguration, IConfigurationSection, IConfigurationProvider
 
 public interface IFileSystem
 {
