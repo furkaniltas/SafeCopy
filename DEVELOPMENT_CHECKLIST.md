@@ -53,24 +53,24 @@
 
 # Phase 2 — Common Document Model
 
-- [ ] `Document`
-- [ ] `DocumentPage`
-- [ ] `TextBlock`
-- [ ] `TextSpan`
-- [ ] `BoundingBox`
-- [ ] `DocumentMetadata`
-- [ ] `SourceReference`
-- [ ] `Detection`
-- [ ] `DetectionType`
-- [ ] Confidence model
-- [ ] Detection state
-- [ ] Selection/masking state
-- [ ] Native text/OCR text distinction
-- [ ] Coordinate system
-- [ ] Text span → bounding box relationship
-- [ ] Cross-run/cross-block text support
-- [ ] Unit tests
-- [ ] Coordinate mapping tests
+- [x] `Document`
+- [x] `DocumentPage`
+- [x] `TextBlock`
+- [x] `TextSpan`
+- [x] `BoundingBox`
+- [x] `DocumentMetadata`
+- [x] `SourceReference`
+- [x] `Detection`
+- [x] `DetectionType`
+- [x] Confidence model
+- [x] Detection state
+- [x] Selection/masking state
+- [x] Native text/OCR text distinction
+- [x] Coordinate system
+- [x] Text span → bounding box relationship
+- [x] Cross-run/cross-block text support
+- [x] Unit tests
+- [x] Coordinate mapping tests
 
 ---
 
