@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EksimSafeCopy.Core\EksimSafeCopy.Core.csproj" />
+    <ProjectReference Include="..\..\src\EksimSafeCopy.DocumentEngine\EksimSafeCopy.DocumentEngine.csproj" />
+    <ProjectReference Include="..\..\src\EksimSafeCopy.Detectors\EksimSafeCopy.Detectors.csproj" />
+    <ProjectReference Include="..\..\src\EksimSafeCopy.Ocr\EksimSafeCopy.Ocr.csproj" />
+    <ProjectReference Include="..\..\src\EksimSafeCopy.Renderer\EksimSafeCopy.Renderer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+  </ItemGroup>
+</Project>
