@@ -1,26 +1,26 @@
-namespace EksimSafeCopy.DocumentEngine.Ingestion.Txt;
-
+﻿namespace EksimSafeCopy.DocumentEngine.Ingestion.Txt;
 using global::EksimSafeCopy.Core.Abstractions;
 using global::EksimSafeCopy.Core.Models;
 using global::EksimSafeCopy.DocumentEngine.Ingestion;
 using global::EksimSafeCopy.DocumentEngine.Security;
 using System.Text;
-
 public sealed class TxtDocumentIngestor : DocumentIngestorBase
 {
     public override DocumentFormat SupportedFormat => DocumentFormat.Txt;
     public override string[] SupportedExtensions => new[] { ".txt" };
-
+    static TxtDocumentIngestor()
+    {
+        // Register encoding provider for legacy encodings like windows-1254
+        Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+    }
     public TxtDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem)
         : base(securityValidator, fileSystem) { }
-
     protected override Result<Document> IngestInternal(string filePath, IngestionOptions options, CancellationToken cancellationToken)
     {
         try
         {
             var encoding = DetectEncoding(filePath);
             var text = File.ReadAllText(filePath, encoding);
-
             return ProcessTextFile(filePath, text, cancellationToken);
         }
         catch (Exception ex)
@@ -28,21 +28,17 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
             return Result<Document>.Failure(Error.Internal($"TXT ingestion failed: {ex.Message}", ex));
         }
     }
-
     protected override Result<Document> IngestFromStreamInternal(Stream stream, IngestionOptions options, CancellationToken cancellationToken)
     {
         try
         {
             // Read stream to detect encoding
             var buffer = new byte[Math.Min(stream.Length, 4096)];
-            stream.ReadExactly(buffer, 0, buffer.Length);
+            var bytesRead = stream.Read(buffer, 0, buffer.Length);
             stream.Position = 0;
-
             var encoding = DetectEncodingFromBytes(buffer);
-            
             using var reader = new StreamReader(stream, encoding, true);
             var text = reader.ReadToEnd();
-
             return ProcessTextFile("stream.txt", text, cancellationToken);
         }
         catch (Exception ex)
@@ -50,7 +46,6 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
             return Result<Document>.Failure(Error.Internal($"TXT ingestion failed: {ex.Message}", ex));
         }
     }
-
     private Result<Document> ProcessTextFile(string filePath, string text, CancellationToken cancellationToken)
     {
         try
@@ -66,7 +61,6 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
                 TextBlocks = CreateTextBlocks(text),
                 IsScanned = false
             };
-
             var document = new Document
             {
                 Name = Path.GetFileNameWithoutExtension(filePath),
@@ -79,7 +73,6 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
                     Modified = File.GetLastWriteTimeUtc(filePath)
                 }
             };
-
             return Result<Document>.Success(document);
         }
         catch (Exception ex)
@@ -87,17 +80,14 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
             return Result<Document>.Failure(Error.Internal($"TXT processing failed: {ex.Message}", ex));
         }
     }
-
     private IReadOnlyList<TextBlock> CreateTextBlocks(string text)
     {
         var lines = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
         var blocks = new List<TextBlock>();
-
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
             if (string.IsNullOrWhiteSpace(line)) continue;
-
             var block = new TextBlock
             {
                 Text = line,
@@ -117,23 +107,20 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
                     }
                 }
             };
-
             blocks.Add(block);
         }
-
         return blocks;
     }
-
     private Encoding DetectEncoding(string filePath)
     {
         var buffer = new byte[4096];
         using (var stream = File.OpenRead(filePath))
         {
-            stream.ReadExactly(buffer, 0, buffer.Length);
+            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+            Array.Resize(ref buffer, bytesRead);
         }
         return DetectEncodingFromBytes(buffer);
     }
-
     private Encoding DetectEncodingFromBytes(byte[] buffer)
     {
         // Check for BOM
@@ -142,38 +129,31 @@ public sealed class TxtDocumentIngestor : DocumentIngestorBase
             // UTF-32 BE: 00 00 FE FF
             if (buffer[0] == 0x00 && buffer[1] == 0x00 && buffer[2] == 0xFE && buffer[3] == 0xFF)
                 return Encoding.GetEncoding("UTF-32BE");
-            
             // UTF-32 LE: FF FE 00 00
             if (buffer[0] == 0xFF && buffer[1] == 0xFE && buffer[2] == 0x00 && buffer[3] == 0x00)
                 return Encoding.GetEncoding("UTF-32");
         }
-
         if (buffer.Length >= 3)
         {
             // UTF-8 BOM: EF BB BF
             if (buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
                 return new UTF8Encoding(true);
         }
-
         if (buffer.Length >= 2)
         {
             // UTF-16 BE: FE FF
             if (buffer[0] == 0xFE && buffer[1] == 0xFF)
                 return Encoding.BigEndianUnicode;
-            
             // UTF-16 LE: FF FE
             if (buffer[0] == 0xFF && buffer[1] == 0xFE)
                 return Encoding.Unicode;
         }
-
         // Try to detect UTF-8 without BOM
         if (IsValidUtf8(buffer))
             return new UTF8Encoding(false);
-
         // Fallback to Windows-1254 (Turkish) or UTF-8
         return Encoding.GetEncoding("windows-1254");
     }
-
     private bool IsValidUtf8(byte[] buffer)
     {
         int i = 0;
