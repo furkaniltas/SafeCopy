@@ -1,0 +1,210 @@
+namespace EksimSafeCopy.DocumentEngine.Ingestion;
+
+using global::EksimSafeCopy.Core.Abstractions;
+using global::EksimSafeCopy.Core.Models;
+using global::EksimSafeCopy.DocumentEngine.Security;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
+{
+    private readonly IEnumerable<IDocumentIngestor> _ingestors;
+    private readonly IDocumentSecurityValidator _securityValidator;
+    private readonly IFileSystem _fileSystem;
+
+    public DocumentEngine(
+        IEnumerable<IDocumentIngestor> ingestors,
+        IDocumentSecurityValidator securityValidator,
+        IFileSystem fileSystem)
+    {
+        _ingestors = ingestors ?? throw new ArgumentNullException(nameof(ingestors));
+        _securityValidator = securityValidator ?? throw new ArgumentNullException(nameof(securityValidator));
+        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    }
+
+    public Result<Document> Load(string filePath, CancellationToken cancellationToken = default)
+    {
+        return Load(filePath, new IngestionOptions(), cancellationToken);
+    }
+
+    public Result<Document> Load(string filePath, IngestionOptions options, CancellationToken cancellationToken = default)
+    {
+        var ingestor = GetIngestorForFile(filePath);
+        if (ingestor == null)
+        {
+            var format = DetectFormat(filePath);
+            return Result<Document>.Failure(Error.FormatError($"Unsupported document format: {format}"));
+        }
+
+        return ingestor.Ingest(filePath, options, cancellationToken);
+    }
+
+    public Result<Document> Load(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default)
+    {
+        return Load(stream, format, new IngestionOptions(), cancellationToken);
+    }
+
+    public Result<Document> Load(Stream stream, DocumentFormat format, IngestionOptions options, CancellationToken cancellationToken = default)
+    {
+        var ingestor = GetIngestorForFormat(format);
+        if (ingestor == null)
+        {
+            return Result<Document>.Failure(Error.FormatError($"Unsupported document format: {format}"));
+        }
+
+        return ingestor.Ingest(stream, options, cancellationToken);
+    }
+
+    public Task<Result<Document>> LoadAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        return LoadAsync(filePath, new IngestionOptions(), cancellationToken);
+    }
+
+    public Task<Result<Document>> LoadAsync(string filePath, IngestionOptions options, CancellationToken cancellationToken = default)
+    {
+        var ingestor = GetIngestorForFile(filePath);
+        if (ingestor == null)
+        {
+            var format = DetectFormat(filePath);
+            return Task.FromResult(Result<Document>.Failure(Error.FormatError($"Unsupported document format: {format}")));
+        }
+
+        return ingestor.IngestAsync(filePath, options, cancellationToken);
+    }
+
+    public Task<Result<Document>> LoadAsync(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default)
+    {
+        return LoadAsync(stream, format, new IngestionOptions(), cancellationToken);
+    }
+
+    public Task<Result<Document>> LoadAsync(Stream stream, DocumentFormat format, IngestionOptions options, CancellationToken cancellationToken = default)
+    {
+        var ingestor = GetIngestorForFormat(format);
+        if (ingestor == null)
+        {
+            return Task.FromResult(Result<Document>.Failure(Error.FormatError($"Unsupported document format: {format}")));
+        }
+
+        return ingestor.IngestAsync(stream, options, cancellationToken);
+    }
+
+    // IDocumentIngestionEngine implementation
+    public Result<Document> Ingest(string filePath, IngestionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        return Load(filePath, options ?? new IngestionOptions(), cancellationToken);
+    }
+
+    public async Task<Result<Document>> IngestAsync(string filePath, IngestionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        return await LoadAsync(filePath, options ?? new IngestionOptions(), cancellationToken);
+    }
+
+    public Result<Document> Ingest(Stream stream, IngestionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var formatResult = DetectFormat(stream);
+        if (formatResult.IsFailure)
+        {
+            return Result<Document>.Failure(formatResult.Error);
+        }
+        return Load(stream, formatResult.Value, options ?? new IngestionOptions(), cancellationToken);
+    }
+
+    public async Task<Result<Document>> IngestAsync(Stream stream, IngestionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var formatResult = DetectFormat(stream);
+        if (formatResult.IsFailure)
+        {
+            return Result<Document>.Failure(formatResult.Error);
+        }
+        return await LoadAsync(stream, formatResult.Value, options ?? new IngestionOptions(), cancellationToken);
+    }
+
+    public Result<DocumentFormat> DetectFormat(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        var format = extension switch
+        {
+            ".pdf" => DocumentFormat.Pdf,
+            ".docx" => DocumentFormat.Docx,
+            ".xlsx" => DocumentFormat.Xlsx,
+            ".txt" => DocumentFormat.Txt,
+            ".udf" => DocumentFormat.Udf,
+            ".png" => DocumentFormat.Png,
+            ".jpg" or ".jpeg" => DocumentFormat.Jpeg,
+            ".tiff" or ".tif" => DocumentFormat.Tiff,
+            ".bmp" => DocumentFormat.Bmp,
+            _ => DocumentFormat.Unknown
+        };
+
+        var signatureFormat = _securityValidator.DetectFormatFromSignature(filePath);
+        if (signatureFormat != DocumentFormat.Unknown && signatureFormat != format)
+        {
+            return Result<DocumentFormat>.Failure(Error.FormatError($"Format mismatch: extension={format}, signature={signatureFormat}"));
+        }
+
+        return Result<DocumentFormat>.Success(format);
+    }
+
+    public async Task<Result<DocumentFormat>> DetectFormatAsync(string filePath)
+    {
+        return await Task.FromResult(DetectFormat(filePath));
+    }
+
+    public Result<DocumentFormat> DetectFormat(Stream stream)
+    {
+        var format = _securityValidator.DetectFormatFromStream(stream);
+        if (format == DocumentFormat.Unknown)
+        {
+            return Result<DocumentFormat>.Failure(Error.FormatError("Could not detect format from stream signature"));
+        }
+        return Result<DocumentFormat>.Success(format);
+    }
+
+    public async Task<Result<DocumentFormat>> DetectFormatAsync(Stream stream)
+    {
+        return await Task.FromResult(DetectFormat(stream));
+    }
+
+    public Result<IReadOnlyList<DocumentFormat>> GetSupportedFormats()
+    {
+        var formats = _ingestors
+            .SelectMany(i => i.SupportedExtensions)
+            .Select(ext => DetectFormatFromExtension("dummy" + ext))
+            .Distinct()
+            .ToList();
+
+        return Result<IReadOnlyList<DocumentFormat>>.Success(formats);
+    }
+
+    private IDocumentIngestor? GetIngestorForFile(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return _ingestors.FirstOrDefault(i => i.SupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private IDocumentIngestor? GetIngestorForFormat(DocumentFormat format)
+    {
+        return _ingestors.FirstOrDefault(i => i.SupportedFormat == format);
+    }
+
+    private DocumentFormat DetectFormatFromExtension(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension switch
+        {
+            ".pdf" => DocumentFormat.Pdf,
+            ".docx" => DocumentFormat.Docx,
+            ".xlsx" => DocumentFormat.Xlsx,
+            ".txt" => DocumentFormat.Txt,
+            ".udf" => DocumentFormat.Udf,
+            ".png" => DocumentFormat.Png,
+            ".jpg" or ".jpeg" => DocumentFormat.Jpeg,
+            ".tiff" or ".tif" => DocumentFormat.Tiff,
+            ".bmp" => DocumentFormat.Bmp,
+            _ => DocumentFormat.Unknown
+        };
+    }
+}

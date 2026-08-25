@@ -9,47 +9,6 @@ using System.Security.Cryptography;
 using CoreHashAlgorithm = EksimSafeCopy.Core.Abstractions.HashAlgorithm;
 using CoreSearchOption = EksimSafeCopy.Core.Abstractions.SearchOption;
 
-public interface IFileSystem
-{
-    Result<bool> Exists(string path);
-    Result<Stream> OpenRead(string path);
-    Result<Stream> OpenWrite(string path, bool overwrite = false);
-    Result<long> GetSize(string path);
-    Result<DateTime> GetLastWriteTimeUtc(string path);
-    Result<string> ComputeHash(string path, CoreHashAlgorithm algorithm = CoreHashAlgorithm.SHA256);
-    Result<IReadOnlyList<string>> EnumerateFiles(string directory, string pattern = "*", CoreSearchOption option = CoreSearchOption.TopDirectoryOnly);
-    Result CreateDirectory(string path);
-    Result DeleteFile(string path);
-    Result DeleteDirectory(string path, bool recursive = false);
-    Result CopyFile(string source, string destination, bool overwrite = false);
-    Result MoveFile(string source, string destination);
-    Result<bool> IsReadOnly(string path);
-    Result SetReadOnly(string path, bool readOnly);
-    Result<string> GetTempFileName(string? extension = null);
-    Result<string> GetTempDirectory();
-}
-
-public interface ITempWorkspace : IDisposable, IAsyncDisposable
-{
-    string RootPath { get; }
-    string InputPath { get; }
-    string ExtractedPath { get; }
-    string OcrPath { get; }
-    string OutputPath { get; }
-    string VerificationPath { get; }
-    
-    Result<string> CreateInputFile(string originalName);
-    Result<string> CreateExtractedFile(string name);
-    Result<string> CreateOcrFile(string name);
-    Result<string> CreateOutputFile(string name);
-    Result<string> CreateVerificationFile(string name);
-    
-    Result Cleanup();
-    Task<Result> CleanupAsync();
-    
-    Result<string> GetUniqueFileName(string directory, string prefix, string extension);
-}
-
 public sealed class FileSystem : IFileSystem
 {
     public Result<bool> Exists(string path)

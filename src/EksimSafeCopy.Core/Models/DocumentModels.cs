@@ -37,6 +37,9 @@ public sealed class Document
 
     public Document WithMetadata(DocumentMetadata metadata)
         => new(Name, Format, Pages) { Id = Id, Metadata = metadata ?? new(), Source = Source };
+
+    public Document WithSource(SourceReference source)
+        => new(Name, Format, Pages) { Id = Id, Metadata = Metadata, Source = source };
 }
 
 /// <summary>
@@ -432,6 +435,24 @@ public sealed class DocumentMetadata
     public long FileSize { get; init; }
     public string FileHash { get; init; } = string.Empty;
     public Dictionary<string, string> CustomProperties { get; init; } = new();
+
+    public DocumentMetadata WithFileInfo(long fileSize, string fileHash)
+    {
+        return new DocumentMetadata
+        {
+            Title = Title,
+            Author = Author,
+            Subject = Subject,
+            Keywords = Keywords,
+            Creator = Creator,
+            Producer = Producer,
+            Created = Created,
+            Modified = Modified,
+            FileSize = fileSize,
+            FileHash = fileHash,
+            CustomProperties = CustomProperties
+        };
+    }
 }
 
 public sealed class SourceReference
