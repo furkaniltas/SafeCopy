@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
@@ -7,9 +8,12 @@ using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
 using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
 using DocModel = global::EksimSafeCopy.Core.Models.Document;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
+using Ox = DocumentFormat.OpenXml;
+using OxPackaging = DocumentFormat.OpenXml.Packaging;
+using OxWord = DocumentFormat.OpenXml.Wordprocessing;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using System.IO;
 using Xunit;
 
 namespace EksimSafeCopy.DocumentEngine.Tests.Ingestion;
@@ -21,6 +25,7 @@ public class DocxIngestionTests
     public DocxIngestionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, global::EksimSafeCopy.Infrastructure.FileSystem>();
         services.AddSingleton<IDocumentIngestor, DocxDocumentIngestor>();
@@ -39,7 +44,7 @@ public class DocxIngestionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Docx);
+            result.Value.Should().Be(DF.Docx);
         }
         finally
         {
@@ -58,7 +63,7 @@ public class DocxIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Docx);
+            result.Value!.Format.Should().Be(DF.Docx);
             result.Value.Pages.Should().NotBeEmpty();
             result.Value.Source.FilePath.Should().Be(tempFile);
             result.Value.Source.FileHash.Should().NotBeEmpty();
@@ -81,16 +86,16 @@ public class DocxIngestionTests
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.docx");
 
-        using (var document = WordprocessingDocument.Create(tempFile, WordprocessingDocumentType.Document))
+        using (var wordDoc = OxPackaging.WordprocessingDocument.Create(tempFile, Ox.WordprocessingDocumentType.Document))
         {
-            var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new Document(
-                new Body(
-                    new Paragraph(
-                        new Run(new Text("Test DOCX Content"))
+            var mainPart = wordDoc.AddMainDocumentPart();
+            mainPart.Document = new OxWord.Document(
+                new OxWord.Body(
+                    new OxWord.Paragraph(
+                        new OxWord.Run(new OxWord.Text("Test DOCX Content"))
                     ),
-                    new Paragraph(
-                        new Run(new Text("Second paragraph with Turkish: Ahmet Yılmaz"))
+                    new OxWord.Paragraph(
+                        new OxWord.Run(new OxWord.Text("Second paragraph with Turkish: Ahmet Yılmaz"))
                     )
                 )
             );

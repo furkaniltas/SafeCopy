@@ -1,12 +1,14 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.Text;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Ingestion.Txt;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
-using DE = global::EksimSafeCopy.DocumentEngine.Ingestion;
+using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -17,13 +19,14 @@ public class TxtIngestionTests
 {
     private readonly IDocumentEngine _documentEngine;
 
-    public TxtIngestionTests()
+public TxtIngestionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IDocumentIngestor, TxtDocumentIngestor>();
-        services.AddSingleton<IDocumentEngine, DE.DocumentEngine>();
+        services.AddSingleton<IDocumentEngine, DocEngine>();
         
         var provider = services.BuildServiceProvider();
         _documentEngine = provider.GetRequiredService<IDocumentEngine>();
@@ -38,7 +41,7 @@ public class TxtIngestionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Txt);
+            result.Value.Should().Be(DF.Txt);
         }
         finally
         {
@@ -57,7 +60,7 @@ public class TxtIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Txt);
+            result.Value!.Format.Should().Be(DF.Txt);
             result.Value.Pages.Should().NotBeEmpty();
             result.Value.Source.FilePath.Should().Be(tempFile);
             result.Value.Source.FileHash.Should().NotBeEmpty();
@@ -68,7 +71,7 @@ public class TxtIngestionTests
         }
     }
 
-    [Fact]
+[Fact]
     public void Load_TurkishEncoding_ReturnsCorrectText()
     {
         var tempFile = CreateTurkishTxt();
@@ -79,9 +82,10 @@ public class TxtIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Text.Should().Contain("Ahmet Yılmaz");
-            result.Value.Text.Should().Contain("İstanbul");
-            result.Value.Text.Should().Contain("ĞüşİÖÇ");
+            var allText = string.Join("\n", result.Value!.Pages.Select(p => p.Text));
+            allText.Should().Contain("Ahmet Yılmaz");
+            allText.Should().Contain("İstanbul");
+            allText.Should().Contain("ĞüşİÖÇ");
         }
         finally
         {
@@ -89,7 +93,7 @@ public class TxtIngestionTests
         }
     }
 
-    [Fact]
+[Fact]
     public void Load_Utf8WithBom_ReturnsCorrectText()
     {
         var tempFile = CreateUtf8WithBom();
@@ -100,7 +104,8 @@ public class TxtIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Text.Should().Contain("Test");
+            var allText = string.Join("\n", result.Value!.Pages.Select(p => p.Text));
+            allText.Should().Contain("Test");
         }
         finally
         {

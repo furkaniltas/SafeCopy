@@ -1,7 +1,8 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.Text;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Ingestion.Pdf;
 using EksimSafeCopy.DocumentEngine.Ingestion.Docx;
@@ -11,6 +12,8 @@ using EksimSafeCopy.DocumentEngine.Ingestion.Udf;
 using EksimSafeCopy.DocumentEngine.Ingestion.Image;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
+using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -21,9 +24,10 @@ public class FormatDetectionTests
 {
     private readonly IDocumentEngine _documentEngine;
 
-    public FormatDetectionTests()
+public FormatDetectionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IDocumentIngestor, PdfDocumentIngestor>();
@@ -47,7 +51,7 @@ public class FormatDetectionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Pdf);
+            result.Value.Should().Be(DF.Pdf);
         }
         finally
         {
@@ -104,7 +108,7 @@ public class FormatDetectionTests
             using var stream = File.OpenRead(tempFile);
             var result = _documentEngine.DetectFormat(stream);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Pdf);
+            result.Value.Should().Be(DF.Pdf);
         }
         finally
         {
@@ -118,13 +122,13 @@ public class FormatDetectionTests
         var result = _documentEngine.GetSupportedFormats();
         
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Contain(DocumentFormat.Pdf);
-        result.Value.Should().Contain(DocumentFormat.Docx);
-        result.Value.Should().Contain(DocumentFormat.Xlsx);
-        result.Value.Should().Contain(DocumentFormat.Txt);
-        result.Value.Should().Contain(DocumentFormat.Udf);
-        result.Value.Should().Contain(DocumentFormat.Png);
-        result.Value.Should().Contain(DocumentFormat.Jpeg);
+        result.Value.Should().Contain(DF.Pdf);
+        result.Value.Should().Contain(DF.Docx);
+        result.Value.Should().Contain(DF.Xlsx);
+        result.Value.Should().Contain(DF.Txt);
+        result.Value.Should().Contain(DF.Udf);
+        result.Value.Should().Contain(DF.Png);
+        result.Value.Should().Contain(DF.Jpeg);
     }
 
     private string CreateTempPdf()

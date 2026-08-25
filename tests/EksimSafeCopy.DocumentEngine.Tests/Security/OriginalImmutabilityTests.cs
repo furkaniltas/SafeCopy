@@ -1,7 +1,9 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.IO.Compression;
+using System.Text;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Ingestion.Pdf;
 using EksimSafeCopy.DocumentEngine.Ingestion.Docx;
@@ -11,7 +13,14 @@ using EksimSafeCopy.DocumentEngine.Ingestion.Udf;
 using EksimSafeCopy.DocumentEngine.Ingestion.Image;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
-using DE = global::EksimSafeCopy.DocumentEngine.Ingestion;
+using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
+using Ox = DocumentFormat.OpenXml;
+using OxPackaging = DocumentFormat.OpenXml.Packaging;
+using OxWord = DocumentFormat.OpenXml.Wordprocessing;
+using OxSpreadsheet = DocumentFormat.OpenXml.Spreadsheet;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -23,9 +32,10 @@ public class OriginalImmutabilityTests
     private readonly IDocumentEngine _documentEngine;
     private readonly IFileSystem _fileSystem;
 
-    public OriginalImmutabilityTests()
+public OriginalImmutabilityTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, global::EksimSafeCopy.Infrastructure.FileSystem>();
         services.AddSingleton<IDocumentIngestor, PdfDocumentIngestor>();
@@ -34,7 +44,7 @@ public class OriginalImmutabilityTests
         services.AddSingleton<IDocumentIngestor, TxtDocumentIngestor>();
         services.AddSingleton<IDocumentIngestor, UdfDocumentIngestor>();
         services.AddSingleton<IDocumentIngestor, ImageDocumentIngestor>();
-        services.AddSingleton<IDocumentEngine, DE.DocumentEngine>();
+        services.AddSingleton<IDocumentEngine, DocEngine>();
         
         var provider = services.BuildServiceProvider();
         _documentEngine = provider.GetRequiredService<IDocumentEngine>();
@@ -176,12 +186,12 @@ public class OriginalImmutabilityTests
         var tempFile = CreateTempPdf();
         var originalHash = ComputeFileHash(tempFile);
 
-        try
+try
         {
             // Open file for reading concurrently
             using var concurrentStream = File.OpenRead(tempFile);
             var buffer = new byte[10];
-            concurrentStream.Read(buffer, 0, 10);
+            concurrentStream.ReadExactly(buffer);
 
             // Now load through document engine
             var result = _documentEngine.Load(tempFile);
@@ -260,13 +270,13 @@ startxref
         return tempFile;
     }
 
-    private string CreateTempDocx()
+private string CreateTempDocx()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.docx");
-        using (var DocModel = WordprocessingDocument.Create(tempFile, WordprocessingDocumentType.Document))
+        using (var wordDoc = OxPackaging.WordprocessingDocument.Create(tempFile, Ox.WordprocessingDocumentType.Document))
         {
-            var mainPart = document.AddMainDocumentPart();
-            mainPart.DocModel = new DocModel(new Body(new Paragraph(new Run(new Text("Test")))));
+            var mainPart = wordDoc.AddMainDocumentPart();
+            mainPart.Document = new OxWord.Document(new OxWord.Body(new OxWord.Paragraph(new OxWord.Run(new OxWord.Text("Test")))));
         }
         return tempFile;
     }
@@ -274,14 +284,14 @@ startxref
     private string CreateTempXlsx()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.xlsx");
-        using (var DocModel = SpreadsheetDocument.Create(tempFile, SpreadsheetDocumentType.Workbook))
+        using (var spreadsheetDoc = OxPackaging.SpreadsheetDocument.Create(tempFile, Ox.SpreadsheetDocumentType.Workbook))
         {
-            var workbookPart = document.AddWorkbookPart();
-            workbookPart.Workbook = new Workbook();
-            var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-            worksheetPart.Worksheet = new Worksheet(new SheetData());
-            var sheets = workbookPart.Workbook.AppendChild(new Sheets());
-            sheets.Append(new Sheet { Id = workbookPart.GetIdOfPart(worksheetPart), SheetId = 1, Name = "Sheet1" });
+            var workbookPart = spreadsheetDoc.AddWorkbookPart();
+            workbookPart.Workbook = new OxSpreadsheet.Workbook();
+            var worksheetPart = workbookPart.AddNewPart<OxPackaging.WorksheetPart>();
+            worksheetPart.Worksheet = new OxSpreadsheet.Worksheet(new OxSpreadsheet.SheetData());
+            var sheets = workbookPart.Workbook.AppendChild(new OxSpreadsheet.Sheets());
+            sheets.Append(new OxSpreadsheet.Sheet { Id = workbookPart.GetIdOfPart(worksheetPart), SheetId = 1, Name = "Sheet1" });
             workbookPart.Workbook.Save();
         }
         return tempFile;

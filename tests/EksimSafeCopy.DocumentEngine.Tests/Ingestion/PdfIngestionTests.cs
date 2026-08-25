@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
@@ -7,9 +8,9 @@ using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
 using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
 using DocModel = global::EksimSafeCopy.Core.Models.Document;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using System.IO;
 using Xunit;
 
 namespace EksimSafeCopy.DocumentEngine.Tests.Ingestion;
@@ -21,6 +22,7 @@ public class PdfIngestionTests
     public PdfIngestionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, global::EksimSafeCopy.Infrastructure.FileSystem>();
         services.AddSingleton<IDocumentIngestor, PdfDocumentIngestor>();
@@ -40,7 +42,7 @@ public class PdfIngestionTests
             var result = _documentEngine.DetectFormat(tempFile);
 
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Pdf);
+            result.Value.Should().Be(DF.Pdf);
         }
         finally
         {
@@ -59,7 +61,7 @@ public class PdfIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Pdf);
+            result.Value!.Format.Should().Be(DF.Pdf);
             result.Value.Pages.Should().NotBeEmpty();
             result.Value.Source.FilePath.Should().Be(tempFile);
             result.Value.Source.FileHash.Should().NotBeEmpty();

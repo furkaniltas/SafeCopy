@@ -1,14 +1,16 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.IO.Compression;
+using System.Text;
+using System.Xml.Linq;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Ingestion.Udf;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
-using DE = global::EksimSafeCopy.DocumentEngine.Ingestion;
-using System.IO.Compression;
-using System.Xml.Linq;
+using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,9 +21,10 @@ public class UdfIngestionTests
 {
     private readonly IDocumentEngine _documentEngine;
 
-    public UdfIngestionTests()
+public UdfIngestionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IDocumentIngestor, UdfDocumentIngestor>();
@@ -40,7 +43,7 @@ public class UdfIngestionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Udf);
+            result.Value.Should().Be(DF.Udf);
         }
         finally
         {
@@ -59,7 +62,7 @@ public class UdfIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Udf);
+            result.Value!.Format.Should().Be(DF.Udf);
             result.Value.Pages.Should().NotBeEmpty();
         }
         finally

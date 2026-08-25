@@ -1,8 +1,15 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.Text;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
 using EksimSafeCopy.DocumentEngine.Security;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
+using Ox = DocumentFormat.OpenXml;
+using OxPackaging = DocumentFormat.OpenXml.Packaging;
+using OxWord = DocumentFormat.OpenXml.Wordprocessing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,9 +20,10 @@ public class DocumentSecurityValidatorTests
 {
     private readonly IDocumentSecurityValidator _validator;
 
-    public DocumentSecurityValidatorTests()
+public DocumentSecurityValidatorTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         var provider = services.BuildServiceProvider();
         _validator = provider.GetRequiredService<IDocumentSecurityValidator>();
@@ -55,7 +63,7 @@ public class DocumentSecurityValidatorTests
         {
             var result = _validator.ValidateFileAccess(tempFile);
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("VALIDATION");
+            result.Error.Code.Should().Be("VALIDATION_ERROR");
         }
         finally
         {
@@ -76,7 +84,7 @@ public class DocumentSecurityValidatorTests
         {
             var result = validator.ValidateFileAccess(tempFile);
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("VALIDATION");
+            result.Error.Code.Should().Be("VALIDATION_ERROR");
         }
         finally
         {
@@ -100,7 +108,7 @@ public class DocumentSecurityValidatorTests
         {
             var result = validator.ValidateFileAccess(tempFile);
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("VALIDATION");
+            result.Error.Code.Should().Be("VALIDATION_ERROR");
         }
         finally
         {
@@ -115,7 +123,7 @@ public class DocumentSecurityValidatorTests
         
         try
         {
-            var result = _validator.ValidateFormatMatch(tempFile, DocumentFormat.Pdf);
+            var result = _validator.ValidateFormatMatch(tempFile, DF.Pdf);
             result.IsSuccess.Should().BeTrue();
         }
         finally
@@ -131,7 +139,7 @@ public class DocumentSecurityValidatorTests
         
         try
         {
-            var result = _validator.ValidateFormatMatch(tempFile, DocumentFormat.Docx);
+            var result = _validator.ValidateFormatMatch(tempFile, DF.Docx);
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("FORMAT_ERROR");
         }
@@ -149,7 +157,7 @@ public class DocumentSecurityValidatorTests
         try
         {
             var format = _validator.DetectFormatFromSignature(tempFile);
-            format.Should().Be(DocumentFormat.Pdf);
+            format.Should().Be(DF.Pdf);
         }
         finally
         {
@@ -166,7 +174,7 @@ public class DocumentSecurityValidatorTests
         {
             var format = _validator.DetectFormatFromSignature(tempFile);
             // DOCX is ZIP-based, signature detection returns Unknown for ZIP-based formats
-            format.Should().Be(DocumentFormat.Unknown);
+            format.Should().Be(DF.Unknown);
         }
         finally
         {
@@ -182,7 +190,7 @@ public class DocumentSecurityValidatorTests
         try
         {
             var format = _validator.DetectFormatFromSignature(tempFile);
-            format.Should().Be(DocumentFormat.Png);
+            format.Should().Be(DF.Png);
         }
         finally
         {
@@ -279,13 +287,13 @@ startxref
         return tempFile;
     }
 
-    private string CreateTempDocx()
+private string CreateTempDocx()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.docx");
-        using (var DocModel = WordprocessingDocument.Create(tempFile, WordprocessingDocumentType.Document))
+        using (var wordDoc = OxPackaging.WordprocessingDocument.Create(tempFile, Ox.WordprocessingDocumentType.Document))
         {
-            var mainPart = document.AddMainDocumentPart();
-            mainPart.DocModel = new DocModel(new Body(new Paragraph(new Run(new Text("Test")))));
+            var mainPart = wordDoc.AddMainDocumentPart();
+            mainPart.Document = new OxWord.Document(new OxWord.Body(new OxWord.Paragraph(new OxWord.Run(new OxWord.Text("Test")))));
         }
         return tempFile;
     }

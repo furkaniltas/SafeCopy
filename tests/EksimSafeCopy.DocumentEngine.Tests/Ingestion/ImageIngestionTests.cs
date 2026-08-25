@@ -1,12 +1,14 @@
-using System.Text;
 using System.IO;
-
-using EksimSafeCopy.Core.Models;\nusing DocModel = global::EksimSafeCopy.Core.Models.DocModel;
+using System.Text;
+using EksimSafeCopy.Core.Abstractions;
+using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Ingestion.Image;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
-using DE = global::EksimSafeCopy.DocumentEngine.Ingestion;
+using DocEngine = global::EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine;
+using DocModel = global::EksimSafeCopy.Core.Models.Document;
+using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using FluentAssertions;
@@ -19,9 +21,10 @@ public class ImageIngestionTests
 {
     private readonly IDocumentEngine _documentEngine;
 
-    public ImageIngestionTests()
+public ImageIngestionTests()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IDocumentIngestor, ImageDocumentIngestor>();
@@ -40,7 +43,7 @@ public class ImageIngestionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Png);
+            result.Value.Should().Be(DF.Png);
         }
         finally
         {
@@ -57,7 +60,7 @@ public class ImageIngestionTests
         {
             var result = _documentEngine.DetectFormat(tempFile);
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(DocumentFormat.Jpeg);
+            result.Value.Should().Be(DF.Jpeg);
         }
         finally
         {
@@ -76,7 +79,7 @@ public class ImageIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Png);
+            result.Value!.Format.Should().Be(DF.Png);
             result.Value.Pages.Should().NotBeEmpty();
             result.Value.Pages[0].IsScanned.Should().BeTrue();
             result.Value.Pages[0].Images.Should().NotBeEmpty();
@@ -100,7 +103,7 @@ public class ImageIngestionTests
 
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().NotBeNull();
-            result.Value!.Format.Should().Be(DocumentFormat.Jpeg);
+            result.Value!.Format.Should().Be(DF.Jpeg);
         }
         finally
         {
