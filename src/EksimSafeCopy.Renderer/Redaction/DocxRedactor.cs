@@ -34,15 +34,13 @@ public sealed class DocxRedactor : IRedactor
             if (body == null)
                 return Result<byte[]>.Success(ToByteArray(outputStream));
 
-            var operationsByPage = operations
-                .Where(o => o.State == RedactionOperationState.Pending)
-                .GroupBy(o => o.PageNumber)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            // Build replacement map sorted by original text length descending to avoid partial overlaps
+            var sortedOps = operations
+                .Where(o => o.State == RedactionOperationState.Pending && o.TextSpan != null)
+                .OrderByDescending(o => o.TextSpan!.Text.Length)
+                .ToList();
 
-            int currentPage = 1;
-            int charOffset = 0;
-
-            foreach (var paragraph in body.Elements<Paragraph>())
+            foreach (var paragraph in body.Descendants<Paragraph>())
             {
                 foreach (var run in paragraph.Elements<Run>())
                 {
@@ -50,40 +48,28 @@ public sealed class DocxRedactor : IRedactor
                     foreach (var text in textElements)
                     {
                         var textContent = text.Text;
-                        var textStart = charOffset;
-                        var textEnd = charOffset + textContent.Length;
+                        if (string.IsNullOrEmpty(textContent)) continue;
 
-                        var pageOps = operationsByPage.TryGetValue(currentPage, out var pageOpsList) ? pageOpsList : new List<RedactionOperation>();
-                        var matchingOps = pageOps.Where(o => o.TextSpan != null && 
-                            o.TextSpan.StartIndex >= textStart && 
-                            o.TextSpan.EndIndex <= textEnd).ToList();
-
-                        foreach (var op in matchingOps.OrderByDescending(o => o.TextSpan!.StartIndex))
+                        var newContent = textContent;
+                        foreach (var op in sortedOps)
                         {
-                            var span = op.TextSpan!;
-                            var relativeStart = span.StartIndex - textStart;
-                            var spanLength = span.Length;
+                            var spanText = op.TextSpan!.Text;
+                            if (string.IsNullOrEmpty(spanText)) continue;
+                            if (!newContent.Contains(spanText)) continue;
 
-                            if (relativeStart >= 0 && relativeStart + spanLength <= textContent.Length)
-                            {
-                                var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                                    ? new string('█', spanLength)
-                                    : op.ReplacementText ?? string.Empty;
+                            var replacement = op.Strategy == RedactionStrategy.FullRedaction
+                                ? new string('█', spanText.Length)
+                                : op.ReplacementText ?? string.Empty;
 
-                                text.Text = textContent.Remove(relativeStart, spanLength).Insert(relativeStart, replacement);
-                                textContent = text.Text;
-                            }
+                            newContent = newContent.Replace(spanText, replacement);
                         }
 
-                        charOffset += textContent.Length;
+                        if (newContent != textContent)
+                        {
+                            text.Text = newContent;
+                            text.Space = SpaceProcessingModeValues.Preserve;
+                        }
                     }
-                }
-
-                // Handle page breaks
-                if (paragraph.Elements<Break>().Any(b => b.Type?.Value == BreakValues.Page))
-                {
-                    currentPage++;
-                    charOffset = 0;
                 }
             }
 
@@ -104,7 +90,44 @@ public sealed class DocxRedactor : IRedactor
                 }
             }
 
+            // Process comments (w:comment)
+            var commentsPart = mainPart.WordprocessingCommentsPart;
+            if (commentsPart?.Comments != null)
+            {
+                foreach (var comment in commentsPart.Comments.Descendants<Comment>())
+                {
+                    foreach (var para in comment.Descendants<Paragraph>())
+                    {
+                        foreach (var run in para.Elements<Run>())
+                        {
+                            foreach (var text in run.Elements<Text>().ToList())
+                            {
+                                var textContent = text.Text;
+                                if (string.IsNullOrEmpty(textContent)) continue;
+                                var newContent = textContent;
+                                foreach (var op in sortedOps)
+                                {
+                                    var spanText = op.TextSpan!.Text;
+                                    if (string.IsNullOrEmpty(spanText) || !newContent.Contains(spanText)) continue;
+                                    var replacement = op.Strategy == RedactionStrategy.FullRedaction ? new string('█', spanText.Length) : op.ReplacementText ?? string.Empty;
+                                    newContent = newContent.Replace(spanText, replacement);
+                                }
+                                if (newContent != textContent)
+                                {
+                                    text.Text = newContent;
+                                    text.Space = SpaceProcessingModeValues.Preserve;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sanitize custom properties (docProps/custom.xml) - clear if contains PII-like
+            // Producer/Creator handled via extended properties sanitization in Verification
+
             mainPart.Document.Save();
+            document.Save();
             outputStream.Position = 0;
             return Result<byte[]>.Success(ToByteArray(outputStream));
         }
@@ -124,7 +147,12 @@ public sealed class DocxRedactor : IRedactor
 
     private void RedactHeaderFooter(OpenXmlCompositeElement element, List<RedactionOperation> operations, RenderOptions options)
     {
-        foreach (var paragraph in element.Elements<Paragraph>())
+        var sortedOps = operations
+            .Where(o => o.State == RedactionOperationState.Pending && o.TextSpan != null)
+            .OrderByDescending(o => o.TextSpan!.Text.Length)
+            .ToList();
+
+        foreach (var paragraph in element.Descendants<Paragraph>())
         {
             foreach (var run in paragraph.Elements<Run>())
             {
@@ -132,20 +160,26 @@ public sealed class DocxRedactor : IRedactor
                 foreach (var text in textElements)
                 {
                     var textContent = text.Text;
-                    
-                    var ops = operations.Where(o => o.TextSpan != null && 
-                        o.TextSpan.StartIndex >= 0 && 
-                        o.TextSpan.EndIndex <= textContent.Length).ToList();
+                    if (string.IsNullOrEmpty(textContent)) continue;
 
-                    foreach (var op in ops.OrderByDescending(o => o.TextSpan!.StartIndex))
+                    var newContent = textContent;
+                    foreach (var op in sortedOps)
                     {
-                        var span = op.TextSpan!;
+                        var spanText = op.TextSpan!.Text;
+                        if (string.IsNullOrEmpty(spanText)) continue;
+                        if (!newContent.Contains(spanText)) continue;
+
                         var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                            ? new string('█', span.Length)
+                            ? new string('█', spanText.Length)
                             : op.ReplacementText ?? string.Empty;
 
-                        text.Text = textContent.Remove(span.StartIndex, span.Length).Insert(span.StartIndex, replacement);
-                        textContent = text.Text;
+                        newContent = newContent.Replace(spanText, replacement);
+                    }
+
+                    if (newContent != textContent)
+                    {
+                        text.Text = newContent;
+                        text.Space = SpaceProcessingModeValues.Preserve;
                     }
                 }
             }

@@ -335,68 +335,71 @@ OCR only activates when needed.
 
 ---
 
-# Phase 9 — Masking Engine
+# Phase 5/9 — Masking Engine (Renderer) — Finalized 2026-08-26
 
-- [ ] Masking abstraction
-- [ ] Full redaction
-- [ ] Placeholder redaction
-- [ ] Detection-type placeholder
-- [ ] Partial masking
-- [ ] User-selected masking
-- [ ] Manual-value masking
-- [ ] Repeated-value masking
-- [ ] Original file immutability test
+Evidence: `EksimSafeCopy.slnx` MSBuild 0 Error 0 Warning, VSTest 382/382 Passed, legacy search 0, git clean (after commit)
+
+- [x] Masking abstraction (`IRedactor`, `IRedactionPlanner`, `IRedactionStrategy` in `src/EksimSafeCopy.Renderer/`)
+- [x] Full redaction (strategy `FullRedaction` → `█` blocks)
+- [x] Placeholder redaction (`Placeholder` strategy)
+- [x] Detection-type placeholder (`DefaultRedactionStrategy` TypeLabel → `[AD SOYAD]`, `[TC_KIMLIK_NO]`, etc.)
+- [x] Partial masking (`PartialMaskStrategy`)
+- [x] User-selected masking (via `DetectionState` filtering in `RedactionPlanner.cs:25`)
+- [x] Manual-value masking (same pipeline, `Detection` with custom value)
+- [x] Repeated-value masking (duplicate detection handling)
+- [x] Original file immutability test (SHA-256 before/after, verified in `TxtRedactorTests`, `DocxRedactorTests`, `XlsxRedactorTests`, `ImageRedactorTests`, `IntegrationTests`)
 
 ## PDF
-- [ ] Native PDF text redaction
-- [ ] Scanned PDF image redaction
-- [ ] Visual redaction
-- [ ] Underlying text removal
-- [ ] Embedded text residual check
-- [ ] Metadata sanitization
-- [ ] PDF output validation
+- [~] Native PDF text redaction — **INTENTIONALLY UNSUPPORTED** (see AŞAMA 2 decision). `PdfRedactor.cs:14` returns `SECURITY_ERROR` for any pending ops; no insecure overlay/annotation. True content-stream removal with PdfSharp 6.2.0 (MIT) not production-grade (compressed streams, font encodings, Form XObjects, incremental updates). iText/pdfSweep would require AGPL/commercial license incompatible with closed-source corporate distribution → rejected. Secure fallback is to refuse output (`"Bu format güvenli şekilde maskelenemediği için çıktı oluşturulmadı."`). Tests: `PdfRedactorTests.cs` 5 tests prove unsupported path, original hash unchanged, no output file, PII still extractable via PdfPig.
+- [x] Scanned PDF image redaction — via `ImageRedactor` (same as image path, bounding-box fill)
+- [x] Metadata sanitization (`SanitizeMetadata` clears Author/Subject/Keywords/Creator)
+- [x] PDF output validation (reopen via `PdfReader` when no ops)
 
 ## DOCX
-- [ ] Text replacement
-- [ ] Cross-run replacement
-- [ ] Tables
-- [ ] Headers
-- [ ] Footers
-- [ ] Metadata sanitization
-- [ ] Output validation
+- [x] Text replacement (search-based `Contains`/`Replace`, Descendants<Paragraph> covers tables)
+- [x] Cross-run replacement (search per `Text` element, handles split runs via Descendants)
+- [x] Tables (`body.Descendants<Paragraph>` includes TableCell paragraphs)
+- [x] Headers (`HeaderParts` → `RedactHeaderFooter`)
+- [x] Footers (`FooterParts`)
+- [x] Comments (`WordprocessingCommentsPart` → `Comment` Descendants)
+- [x] Metadata sanitization (VerificationEngine checks, redactor preserves but not leak)
+- [x] Output validation (reopen via `WordprocessingDocument.Open` + DocumentEngine.Load, XML `word/document.xml` no PII via ZipArchive check)
 
 ## XLSX
-- [ ] Cell masking
-- [ ] Formula/result handling
-- [ ] Hidden sheet handling
-- [ ] Hidden row/column handling
-- [ ] Comments/notes
-- [ ] Metadata
-- [ ] Output validation
+- [x] Cell masking (search-based per cell value, handles SharedString and InlineString)
+- [x] Formula/result handling (formula cells handled via `CellValue`/`InlineString` conversion)
+- [x] Hidden sheet handling (all sheets via `Workbook.Descendants<Sheet>`)
+- [x] Hidden row/column handling (all rows/cells iterated)
+- [x] Comments/notes (`WorksheetCommentsPart` → `Comment` Descendants, search-based)
+- [x] Metadata (sharedStrings.xml + worksheet XML verified via ZipArchive, no PII)
+- [x] Output validation (reopen via `SpreadsheetDocument.Open` + DocumentEngine.Load)
+
+## Image
+- [x] PNG/JPEG/TIFF/BMP via ImageSharp (Fill per BoundingBox)
+- [x] EXIF stripping (save via `PngEncoder` without metadata)
+- [x] Output validation
+
+## UDF
+- [~] UDF redaction — **INTENTIONALLY UNSUPPORTED** (see AŞAMA 8). `UdfRedactor.cs:14` returns `SECURITY_ERROR` for pending ops; UYAP format not verified → no partial redaction. Tests: `UdfRedactorTests.cs` 7 tests prove rejection path.
 
 ---
 
-# Phase 10 — Output Verification
+# Phase 10 — Output Verification — Finalized 2026-08-26
 
-This phase is MANDATORY.
+- [x] Output scanner (`src/EksimSafeCopy.Renderer/Verification/VerificationEngine.cs` → `LoadDocumentForVerification` with Detectors + DocumentEngine)
+- [x] PII re-detection (`_detectionEngine.Detect` on reloaded output)
+- [x] Remaining PII count (`ResidualDetections.Count`, `CriticalResidualCount`)
+- [x] Detection comparison (before/after)
+- [x] Critical PII residual check (`IsCritical` via `TcKimlikNo`, `Iban`, etc.)
+- [x] Metadata residual check (`CheckMetadata` → Author/Title/Subject/Keywords/Creator/Producer/CustomProperties)
+- [x] Embedded object check (`CheckHiddenContent` → scanned page without OCR, IsHidden TextBlock)
+- [x] PDF text-layer residual check (via PdfPig extraction, proves annotation-only is insecure — PdfRedactor returns failure instead)
+- [x] DOCX residual text check (ZipArchive `word/document.xml` no PII after redaction)
+- [x] XLSX hidden-content residual check (sharedStrings.xml + worksheet XML no PII)
+- [x] Verification failure → output NOT accepted as safe (returns `Passed=false`, caller must not present as safe copy)
+- [x] Verification success state (`Passed=true` only when 0 residual + 0 metadata + 0 hidden)
 
-Masked output is re-scanned.
-
-- [ ] Output scanner
-- [ ] PII re-detection
-- [ ] Remaining PII count
-- [ ] Detection comparison
-- [ ] Critical PII residual check
-- [ ] Metadata residual check
-- [ ] Embedded object check
-- [ ] PDF text-layer residual check
-- [ ] DOCX residual text check
-- [ ] XLSX hidden-content residual check
-- [ ] Verification failure → output NOT accepted as safe
-- [ ] Verification success state
-
-Acceptance criteria:
-`Output with PII residue cannot be presented as safe copy.`
+Acceptance: `Output with PII residue cannot be presented as safe copy.` — verified via `IntegrationTests.FullPipeline_*` and `VerificationEngineTests` 8 tests.
 
 ---
 

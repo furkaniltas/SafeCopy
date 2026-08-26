@@ -3,6 +3,7 @@ namespace EksimSafeCopy.Renderer.Redaction;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
 using System.Text;
+using System.Text.RegularExpressions;
 
 public sealed class TxtRedactor : IRedactor
 {
@@ -13,17 +14,25 @@ public sealed class TxtRedactor : IRedactor
         try
         {
             var encoding = DetectEncoding(documentBytes);
-            var text = encoding.GetString(documentBytes);
+            var originalText = encoding.GetString(documentBytes);
+
+            // Remove BOM if present
+            if (originalText.Length > 0 && originalText[0] == '\uFEFF')
+            {
+                originalText = originalText.Substring(1);
+            }
 
             var operations = plan.Operations
                 .Where(o => o.State == RedactionOperationState.Pending)
                 .OrderByDescending(o => o.TextSpan?.StartIndex ?? 0)
                 .ToList();
 
-            var textBuilder = new StringBuilder(text);
+            var textBuilder = new StringBuilder(originalText);
 
             foreach (var op in operations)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (op.TextSpan == null) continue;
 
                 var start = op.TextSpan.StartIndex;
@@ -31,10 +40,27 @@ public sealed class TxtRedactor : IRedactor
 
                 if (start >= 0 && start + length <= textBuilder.Length)
                 {
-                    var replacement = op.Strategy == RedactionStrategy.FullRedaction 
+                    // Verify the text matches
+                    var actualText = textBuilder.ToString(start, length);
+                    if (actualText != op.TextSpan.Text)
+                    {
+                        // Try to find the text near the expected position
+                        var foundIndex = FindTextNearPosition(textBuilder.ToString(), op.TextSpan.Text, start);
+                        if (foundIndex >= 0)
+                        {
+                            start = foundIndex;
+                            length = op.TextSpan.Text.Length;
+                        }
+                        else
+                        {
+                            continue; // Text not found, skip
+                        }
+                    }
+
+                    var replacement = op.Strategy == RedactionStrategy.FullRedaction
                         ? new string('█', length)
-                        : op.ReplacementText ?? string.Empty;
-                    
+                        : op.ReplacementText ?? op.DetectionType.ToString();
+
                     textBuilder.Remove(start, length);
                     textBuilder.Insert(start, replacement);
                 }
@@ -55,18 +81,33 @@ public sealed class TxtRedactor : IRedactor
         }
     }
 
+    private static int FindTextNearPosition(string text, string searchText, int expectedPosition)
+    {
+        var startSearch = Math.Max(0, expectedPosition - 50);
+        var endSearch = Math.Min(text.Length - searchText.Length, expectedPosition + 50);
+
+        for (int i = Math.Max(0, expectedPosition - 50); i <= Math.Min(text.Length - searchText.Length, expectedPosition + 50); i++)
+        {
+            if (i + searchText.Length <= text.Length && text.Substring(i, searchText.Length) == searchText)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public async Task<Result<byte[]>> RedactAsync(byte[] documentBytes, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default)
     {
         return await Task.Run(() => Redact(documentBytes, plan, options, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
-public Result<byte[]> RedactToFile(string inputPath, string outputPath, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default)
+    public Result<byte[]> RedactToFile(string inputPath, string outputPath, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default)
     {
         try
         {
             var bytes = File.ReadAllBytes(inputPath);
             var result = Redact(bytes, plan, options, cancellationToken);
-            
+
             if (result.IsFailure)
                 return Result<byte[]>.Failure(result.Error);
 
@@ -104,7 +145,7 @@ public Result<byte[]> RedactToFile(string inputPath, string outputPath, Redactio
         {
             if (bytes[0] == 0xFF && bytes[1] == 0xFE)
                 return Encoding.Unicode;
-            if (bytes[0] == 0xFE && bytes[1] == 0xFF)
+            if (bytes[0] == 0xFE && bytes[1] == 0xFE)
                 return Encoding.BigEndianUnicode;
         }
 

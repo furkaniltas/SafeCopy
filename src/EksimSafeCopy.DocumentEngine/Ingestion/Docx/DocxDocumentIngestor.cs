@@ -110,7 +110,8 @@ public sealed class DocxDocumentIngestor : DocumentIngestorBase
         var body = mainDocumentPart.Document.Body;
         if (body == null) return string.Empty;
 
-        return body.InnerText;
+        // Join paragraph texts with newline to preserve boundaries for detection
+        return string.Join("\n", body.Elements<Paragraph>().Select(p => p.InnerText));
     }
 
     private IReadOnlyList<TextBlock> ExtractTextBlocks(MainDocumentPart mainDocumentPart)

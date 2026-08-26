@@ -2,9 +2,8 @@ namespace EksimSafeCopy.Renderer.Redaction;
 
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
-using System.Text;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 
 public sealed class PdfRedactor : IRedactor
 {
@@ -12,52 +11,42 @@ public sealed class PdfRedactor : IRedactor
 
     public Result<byte[]> Redact(byte[] documentBytes, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default)
     {
+        // AŞAMA 2 KARARI: PdfSharp 6.2.0 (MIT) ile production-grade true redaction
+        // güvenilir şekilde yapılamamaktadır.
+        // - Content stream'ler compressed (FlateDecode), multiple streams, Form XObjects,
+        //   font encoding/glyph mapping, Tj/TJ operatörleri, incremental update,
+        //   annotation/attachment/metadata gibi attack surface'ler tam kapsanmıyor.
+        // - Sadece siyah dikdörtgen/annotation eklemek text extraction ile PII'nin
+        //   tekrar elde edilmesini engellemez → güvensiz.
+        // - iText + pdfSweep true redaction sağlar ancak AGPL lisansı kapalı kaynak
+        //   kurumsal Eksim SafeCopy dağıtımı için uygun değil; commercial lisans
+        //   maliyet/onay gerektirir ve sessizce eklenemez.
+        // Bu nedenle güvenli fallback: PDF redaction unsupported → Failure.
+        // Bu, güvensiz PDF üretmekten daha doğrudur (AGENTS.md: Security > all).
+        var hasPending = plan.Operations.Any(o => o.State == RedactionOperationState.Pending);
+        if (hasPending)
+        {
+            return Result<byte[]>.Failure(Error.SecurityError(
+                "PDF redaction desteklenmiyor: PdfSharp 6.2.0 ile true content-stream text removal güvenilir şekilde yapılamıyor. " +
+                "Sadece annotation/overlay güvenli true redaction değildir. iText/pdfSweep AGPL olduğundan kapalı kaynak kurumsal ürün için commercial lisans gerektirir. " +
+                "Bu nedenle PII içeren PDF için güvenli çıktı oluşturulmadı. Lütfen PDF'i TXT/DOCX/XLSX/Image formatına dönüştürün veya manuel redaksiyon uygulayın.",
+                new { format = "PDF", pendingOperations = hasPending }));
+        }
+
+        // No pending operations → return original bytes (no PII to redact)
+        // Still sanitize metadata as best-effort for PII-free PDFs
         try
         {
-            var operations = plan.Operations
-                .Where(o => o.State == RedactionOperationState.Pending)
-                .ToList();
-
-            if (!operations.Any())
-            {
-                return Result<byte[]>.Success(documentBytes);
-            }
-
-            using var inputStream = new MemoryStream(documentBytes);
-            using var outputStream = new MemoryStream();
-            
-            // We need to write to a temporary file for PdfPig
             var tempInput = Path.GetTempFileName();
             var tempOutput = Path.GetTempFileName();
-            
             try
             {
                 File.WriteAllBytes(tempInput, documentBytes);
-                
-                using (var pdfDocument = PdfDocument.Open(tempInput))
-                {
-                    var pages = pdfDocument.GetPages().ToList();
-                    
-                    foreach (var page in pages)
-                    {
-                        var pageNumber = page.Number;
-                        var pageOps = plan.Operations
-                            .Where(o => o.State == RedactionOperationState.Pending && o.PageNumber == pageNumber)
-                            .ToList();
-
-                        if (!pageOps.Any()) continue;
-
-                        // For PdfPig, we need to use a different approach
-                        // PdfPig is primarily a reading library, not a writing library
-                        // We'll need to use a different approach for PDF redaction
-                    }
-                }
-
-                // Since PdfPig is read-only, we need a different approach
-                // For true PDF redaction, we would need a library like PdfSharp or iTextSharp
-                // For now, we'll implement a basic approach using a different strategy
-                
-                return Result<byte[]>.Failure(Error.FormatError("PDF redaction requires a PDF manipulation library. PdfPig is read-only."));
+                using var document = PdfReader.Open(tempInput, PdfDocumentOpenMode.Modify);
+                SanitizeMetadata(document);
+                document.Save(tempOutput);
+                var resultBytes = File.ReadAllBytes(tempOutput);
+                return Result<byte[]>.Success(resultBytes);
             }
             finally
             {
@@ -65,13 +54,20 @@ public sealed class PdfRedactor : IRedactor
                 if (File.Exists(tempOutput)) File.Delete(tempOutput);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return Result<byte[]>.Failure(Error.Cancelled("PDF redaction was cancelled"));
-        }
         catch (Exception ex)
         {
-            return Result<byte[]>.Failure(Error.Internal($"PDF redaction failed: {ex.Message}", ex));
+            return Result<byte[]>.Failure(Error.Internal($"PDF metadata sanitization failed: {ex.Message}", ex));
+        }
+    }
+
+    private void SanitizeMetadata(PdfDocument document)
+    {
+        if (document.Info != null)
+        {
+            document.Info.Author = string.Empty;
+            document.Info.Subject = string.Empty;
+            document.Info.Keywords = string.Empty;
+            document.Info.Creator = string.Empty;
         }
     }
 
@@ -86,7 +82,7 @@ public sealed class PdfRedactor : IRedactor
         {
             var bytes = File.ReadAllBytes(inputPath);
             var result = Redact(bytes, plan, options, cancellationToken);
-            
+
             if (result.IsFailure)
                 return Result<byte[]>.Failure(result.Error);
 
@@ -94,9 +90,7 @@ public sealed class PdfRedactor : IRedactor
             if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                 Directory.CreateDirectory(outputDir!);
 
-            var tempPath = outputPath + ".tmp";
-            File.WriteAllBytes(tempPath, result.Value);
-            File.Move(tempPath, outputPath, true);
+            File.WriteAllBytes(outputPath, result.Value);
 
             return Result<byte[]>.Success(result.Value);
         }

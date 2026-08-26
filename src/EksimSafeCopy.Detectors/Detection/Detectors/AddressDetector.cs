@@ -20,6 +20,10 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
         @"\b(?:[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)\s+(?:mahalle|mah|mh|mah\.)\s*(?:[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)\s+(?:caddesi|cadde|cad|sokak|sokak\.|sok|sok\.)\s*(?:no|numara)?\s*[:]?\s*\d+\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly Regex ResidencyPattern = new(
+        @"\b(?:[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)\s*(?:'|\s+)(?:da|de|ta|te)\s+yaşıyor\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly HashSet<string> NegativeAddressKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
         "şirket adresi", "firma adresi", "kurum adresi", "resmi adres",
@@ -32,7 +36,7 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
         var detections = new List<Detection>();
         var text = normalizedText.Text;
 
-        var patterns = new[] { AddressPattern, SimpleAddressPattern };
+        var patterns = new[] { AddressPattern, SimpleAddressPattern, ResidencyPattern };
 
         foreach (var pattern in patterns)
         {

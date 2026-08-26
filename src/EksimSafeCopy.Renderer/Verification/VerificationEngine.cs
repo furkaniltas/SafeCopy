@@ -4,6 +4,8 @@ using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.Detectors.Detection.Pipeline;
+using EksimSafeCopy.Detectors.Detection.Detectors;
+using EksimSafeCopy.Detectors;
 using EksimSafeCopy.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using EksimSafeCopy.DocumentEngine.Security;
@@ -39,9 +41,10 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
             if (loadResult.IsFailure)
                 return Result<VerificationResult>.Failure(loadResult.Error);
 
-            var document = loadResult.Value;
+            var document = loadResult.Value.Document;
+            var detectionEngine = loadResult.Value.DetectionEngine;
 
-            var detectResult = _detectionEngine.Detect(document, cancellationToken);
+            var detectResult = detectionEngine.Detect(document, cancellationToken);
             if (detectResult.IsFailure)
                 return Result<VerificationResult>.Failure(detectResult.Error);
 
@@ -110,9 +113,9 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
             }
 
             var result = Verify(tempPath, format, cancellationToken);
-            
+
             if (File.Exists(tempPath)) File.Delete(tempPath);
-            
+
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -130,9 +133,10 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
         return await Task.Run(() => Verify(stream, format, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
-    private Result<Document> LoadDocumentForVerification(string filePath, DocumentFormat format, CancellationToken cancellationToken)
+private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocumentForVerification(string filePath, DocumentFormat format, CancellationToken cancellationToken)
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
         services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
         services.AddSingleton<IFileSystem, EksimSafeCopy.Infrastructure.FileSystem>();
         services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Pdf.PdfDocumentIngestor>();
@@ -141,17 +145,52 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
         services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Txt.TxtDocumentIngestor>();
         services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Udf.UdfDocumentIngestor>();
         services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Image.ImageDocumentIngestor>();
+
+        // Add detectors for verification
+        services.AddSingleton<ITurkishIdentityNumberDetector, EksimSafeCopy.Detectors.Detection.Detectors.TurkishIdentityNumberDetector>();
+        services.AddSingleton<IPhoneNumberDetector, EksimSafeCopy.Detectors.Detection.Detectors.PhoneNumberDetector>();
+        services.AddSingleton<IEmailDetector, EksimSafeCopy.Detectors.Detection.Detectors.EmailDetector>();
+        services.AddSingleton<IBirthDateDetector, EksimSafeCopy.Detectors.Detection.Detectors.BirthDateDetector>();
+        services.AddSingleton<IPersonNameDetector, EksimSafeCopy.Detectors.Detection.Detectors.PersonNameDetector>();
+        services.AddSingleton<IAddressDetector, EksimSafeCopy.Detectors.Detection.Detectors.AddressDetector>();
+        services.AddSingleton<IInstallationNumberDetector, EksimSafeCopy.Detectors.Detection.Detectors.InstallationNumberDetector>();
+
+        services.AddSingleton<IReadOnlyList<IDetector>>(sp =>
+        {
+            return new List<IDetector>
+            {
+                sp.GetRequiredService<ITurkishIdentityNumberDetector>(),
+                sp.GetRequiredService<IPhoneNumberDetector>(),
+                sp.GetRequiredService<IEmailDetector>(),
+                sp.GetRequiredService<IBirthDateDetector>(),
+                sp.GetRequiredService<IPersonNameDetector>(),
+                sp.GetRequiredService<IAddressDetector>(),
+                sp.GetRequiredService<IInstallationNumberDetector>()
+            }.AsReadOnly();
+        });
+
+        services.AddSingleton<IDetectionEngine>(sp =>
+        {
+            var detectors = sp.GetRequiredService<IReadOnlyList<IDetector>>();
+            return new EksimSafeCopy.Detectors.Detection.Pipeline.DetectionEngine(detectors);
+        });
+
         services.AddSingleton<IDocumentEngine, EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine>();
 
         var provider = services.BuildServiceProvider();
         var engine = provider.GetRequiredService<IDocumentEngine>();
+        var detectionEngine = provider.GetRequiredService<IDetectionEngine>();
 
         var formatResult = engine.DetectFormat(filePath);
         if (formatResult.IsFailure)
-            return Result<Document>.Failure(formatResult.Error);
+            return Result<(Document Document, IDetectionEngine DetectionEngine)>.Failure(formatResult.Error);
 
         // Use simple load with default options - the engine will auto-detect format
-        return engine.Load(filePath, cancellationToken);
+        var loadResult = engine.Load(filePath, cancellationToken);
+        if (loadResult.IsFailure)
+            return Result<(Document Document, IDetectionEngine DetectionEngine)>.Failure(loadResult.Error);
+
+        return Result<(Document Document, IDetectionEngine DetectionEngine)>.Success((loadResult.Value, detectionEngine));
     }
 
     private IReadOnlyList<string> CheckMetadata(Document document)

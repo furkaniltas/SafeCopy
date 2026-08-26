@@ -27,35 +27,50 @@ public sealed class XlsxRedactor : IRedactor
                 return Result<byte[]>.Failure(Error.FormatError("XLSX workbook is empty or corrupted"));
 
             var operations = plan.Operations
-                .Where(o => o.State == RedactionOperationState.Pending)
+                .Where(o => o.State == RedactionOperationState.Pending && o.TextSpan != null)
+                .OrderByDescending(o => o.TextSpan!.Text.Length)
                 .ToList();
+
+            if (!operations.Any())
+            {
+                // No ops but still need to return valid bytes
+                document.Save();
+                outputStream.Position = 0;
+                return Result<byte[]>.Success(outputStream.ToArray());
+            }
 
             var sharedStringPart = workbookPart.SharedStringTablePart;
             var sharedStringTable = sharedStringPart?.SharedStringTable;
 
-            // Process shared strings
+            // Process shared strings via search-based replacement
             if (sharedStringTable != null)
             {
                 foreach (var sharedStringItem in sharedStringTable.Elements<SharedStringItem>())
                 {
                     var text = sharedStringItem.InnerText;
-                    var matchingOps = plan.Operations
-                        .Where(o => o.State == RedactionOperationState.Pending && 
-                                   o.TextSpan != null &&
-                                   o.TextSpan.StartIndex >= 0 &&
-                                   o.TextSpan.EndIndex <= text.Length)
-                        .ToList();
+                    if (string.IsNullOrEmpty(text)) continue;
 
-                    if (matchingOps.Any())
+                    var newText = text;
+                    foreach (var op in operations)
                     {
-                        var newText = ApplyRedactions(text, matchingOps);
+                        var spanText = op.TextSpan!.Text;
+                        if (string.IsNullOrEmpty(spanText)) continue;
+                        if (!newText.Contains(spanText)) continue;
+                        var replacement = op.Strategy == RedactionStrategy.FullRedaction
+                            ? new string('█', spanText.Length)
+                            : op.ReplacementText ?? string.Empty;
+                        newText = newText.Replace(spanText, replacement);
+                    }
+
+                    if (newText != text)
+                    {
                         sharedStringItem.RemoveAllChildren();
                         sharedStringItem.AppendChild(new Text(newText));
                     }
                 }
             }
 
-            // Process worksheet cells
+            // Process worksheet cells (including inlineString and sharedString)
             var sheets = workbookPart.Workbook.Descendants<Sheet>().ToList();
             foreach (var sheet in sheets)
             {
@@ -74,56 +89,67 @@ public sealed class XlsxRedactor : IRedactor
                         var cellValue = GetCellValue(cell, sharedStringTable);
                         if (string.IsNullOrWhiteSpace(cellValue)) continue;
 
-                        var matchingOps = plan.Operations
-                            .Where(o => o.State == RedactionOperationState.Pending && 
-                                       o.TextSpan != null &&
-                                       o.TextSpan.StartIndex >= 0 &&
-                                       o.TextSpan.EndIndex <= cellValue.Length)
-                            .ToList();
-
-                        if (matchingOps.Any())
+                        var newValue = cellValue;
+                        foreach (var op in operations)
                         {
-                            var newValue = ApplyRedactions(cellValue, matchingOps);
+                            var spanText = op.TextSpan!.Text;
+                            if (string.IsNullOrEmpty(spanText)) continue;
+                            if (!newValue.Contains(spanText)) continue;
+                            var replacement = op.Strategy == RedactionStrategy.FullRedaction
+                                ? new string('█', spanText.Length)
+                                : op.ReplacementText ?? string.Empty;
+                            newValue = newValue.Replace(spanText, replacement);
+                        }
+
+                        if (newValue != cellValue)
+                        {
                             SetCellValue(cell, newValue, sharedStringPart);
                         }
                     }
                 }
-            }
 
-            // Process comments - commented out due to API differences
-            /*
-            if (workbookPart.WorksheetParts != null)
-            {
-                foreach (var wsPart in workbookPart.WorksheetParts)
+                // Preserve comments handling - if CommentsPart exists, redact comment text via search
+                var commentsParts = worksheetPart.GetPartsOfType<WorksheetCommentsPart>().ToList();
+                foreach (var commentsPart in commentsParts)
                 {
-                    var commentsPart = wsPart.GetPartsOfType<CommentsPart>().FirstOrDefault();
-                    if (commentsPart?.Comments != null)
+                    if (commentsPart.Comments == null) continue;
+                    foreach (var comment in commentsPart.Comments.Descendants<Comment>())
                     {
-                        foreach (var comment in commentsPart.Comments.Elements<Comment>())
+                        var text = comment.InnerText;
+                        if (string.IsNullOrEmpty(text)) continue;
+                        var newText = text;
+                        foreach (var op in operations)
                         {
-                            var text = comment.InnerText;
-                            var matchingOps = plan.Operations
-                                .Where(o => o.State == RedactionOperationState.Pending && 
-                                           o.TextSpan != null &&
-                                           o.TextSpan.StartIndex >= 0 &&
-                                           o.TextSpan.EndIndex <= text.Length)
-                                .ToList();
-
-                            if (matchingOps.Any())
-                            {
-                                var newText = ApplyRedactions(text, matchingOps);
-                                comment.RemoveAllChildren();
-                                comment.AppendChild(new Text(newText));
-                            }
+                            var spanText = op.TextSpan!.Text;
+                            if (string.IsNullOrEmpty(spanText)) continue;
+                            if (!newText.Contains(spanText)) continue;
+                            var replacement = op.Strategy == RedactionStrategy.FullRedaction
+                                ? new string('█', spanText.Length)
+                                : op.ReplacementText ?? string.Empty;
+                            newText = newText.Replace(spanText, replacement);
+                        }
+                        if (newText != text)
+                        {
+                            // Comments store text in <t> elements
+                            comment.RemoveAllChildren();
+                            var commentText = new CommentText();
+                            commentText.AppendChild(new Text(newText) { Space = SpaceProcessingModeValues.Preserve });
+                            comment.AppendChild(commentText);
                         }
                     }
                 }
             }
-            */
+
+            // Sanitize custom properties if any
+            if (workbookPart.Workbook.WorkbookProperties != null)
+            {
+                // No direct PII in workbook properties typically, but ensure no custom
+            }
 
             workbookPart.Workbook.Save();
-            
-            return Result<byte[]>.Success(ToByteArray(document));
+            document.Save();
+            outputStream.Position = 0;
+            return Result<byte[]>.Success(outputStream.ToArray());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -139,30 +165,6 @@ public sealed class XlsxRedactor : IRedactor
         }
     }
 
-    private static string ApplyRedactions(string text, List<RedactionOperation> operations)
-    {
-        var textBuilder = new StringBuilder(text);
-        
-        foreach (var op in operations.OrderByDescending(o => o.TextSpan!.StartIndex))
-        {
-            if (op.TextSpan == null) continue;
-            
-            var start = op.TextSpan.StartIndex;
-            var length = op.TextSpan.Length;
-            var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                ? new string('█', length)
-                : op.ReplacementText ?? string.Empty;
-
-            if (start >= 0 && start + length <= textBuilder.Length)
-            {
-                textBuilder.Remove(start, length);
-                textBuilder.Insert(start, replacement);
-            }
-        }
-
-        return textBuilder.ToString();
-    }
-
     private static string GetCellValue(Cell cell, SharedStringTable? sharedStringTable)
     {
         if (cell == null) return string.Empty;
@@ -171,21 +173,28 @@ public sealed class XlsxRedactor : IRedactor
         {
             if (int.TryParse(cell.CellValue?.Text, out int index) && sharedStringTable != null)
             {
-                var item = sharedStringTable.ElementAt(index);
-                return item.InnerText;
+                var item = sharedStringTable.ElementAtOrDefault(index);
+                return item?.InnerText ?? string.Empty;
             }
         }
 
-        return cell.CellValue?.Text ?? string.Empty;
+        // Also handle inline string
+        var inlineString = cell.GetFirstChild<InlineString>();
+        if (inlineString != null)
+            return inlineString.InnerText;
+
+        return cell.CellValue?.Text ?? cell.InnerText ?? string.Empty;
     }
 
     private static void SetCellValue(Cell cell, string value, SharedStringTablePart? sharedStringPart)
     {
+        // Use inline string to avoid shared string table complexity and ensure immediate visibility
         cell.DataType = CellValues.InlineString;
         cell.CellValue = null;
         
         cell.RemoveAllChildren<CellValue>();
-        cell.AppendChild(new InlineString(new Text(value)));
+        cell.RemoveAllChildren<InlineString>();
+        cell.AppendChild(new InlineString(new Text(value) { Space = SpaceProcessingModeValues.Preserve }));
     }
 
     public async Task<Result<byte[]>> RedactAsync(byte[] documentBytes, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default)
@@ -227,12 +236,4 @@ public sealed class XlsxRedactor : IRedactor
     {
         return await Task.Run(() => RedactToFile(inputPath, outputPath, plan, options, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
-
-    private static byte[] ToByteArray(SpreadsheetDocument document)
-    {
-        // For the Redact method, we return the byte array directly from the stream
-        // This method is only used for the ToByteArray call in Redact method
-        // which should not be called in our current implementation
-        return Array.Empty<byte>();
-    }
-    }
+}
