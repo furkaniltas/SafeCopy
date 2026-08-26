@@ -659,6 +659,7 @@ public sealed class RenderOptions
     public bool MaskRepeatedValues { get; init; } = true;
     public bool SanitizeMetadata { get; init; } = true;
     public bool RemoveHiddenContent { get; init; } = true;
+    public double ConfidenceThreshold { get; init; } = 0.5;
     public Dictionary<DetectionType, string> TypePlaceholders { get; init; } = new()
     {
         { DetectionType.TcKimlikNo, "[TC_KIMLIK_NO]" },

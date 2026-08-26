@@ -71,6 +71,68 @@ public interface IVerificationEngine
     Task<Result<VerificationResult>> VerifyAsync(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default);
 }
 
+public sealed class RedactionOperation
+{
+    public string DetectionId { get; init; } = string.Empty;
+    public DetectionType DetectionType { get; init; }
+    public int PageNumber { get; init; }
+    public TextSpan? TextSpan { get; init; }
+    public BoundingBox BoundingBox { get; init; } = BoundingBox.Empty;
+    public CoordinateSystem? CoordinateSystem { get; init; }
+    public RedactionStrategy Strategy { get; init; } = RedactionStrategy.TypeLabel;
+    public string? ReplacementText { get; init; }
+    public double Confidence { get; init; }
+    public RedactionOperationState State { get; set; } = RedactionOperationState.Pending;
+}
+
+public enum RedactionStrategy
+{
+    FullRedaction,
+    TypeLabel,
+    PartialMask,
+    Placeholder,
+    Custom
+}
+
+public enum RedactionOperationState
+{
+    Pending,
+    Applied,
+    Failed,
+    Skipped
+}
+
+public sealed class RedactionPlan
+{
+    public string DocumentId { get; init; } = string.Empty;
+    public IReadOnlyList<RedactionOperation> Operations { get; init; } = Array.Empty<RedactionOperation>();
+    public DocumentFormat Format { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+}
+
+public interface IRedactionPlanner
+{
+    Result<RedactionPlan> CreatePlan(Document document, IReadOnlyList<Detection> detections, RenderOptions options, CancellationToken cancellationToken = default);
+    Task<Result<RedactionPlan>> CreatePlanAsync(Document document, IReadOnlyList<Detection> detections, RenderOptions options, CancellationToken cancellationToken = default);
+}
+
+public interface IRedactionStrategy
+{
+    RedactionStrategy Type { get; }
+    string GetReplacementText(DetectionType type, RenderOptions options);
+    bool SupportsFormat(DocumentFormat format);
+}
+
+public interface IRedactor
+{
+    DocumentFormat TargetFormat { get; }
+    Result<byte[]> Redact(byte[] documentBytes, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default);
+    Task<Result<byte[]>> RedactAsync(byte[] documentBytes, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default);
+    
+    Result<byte[]> RedactToFile(string inputPath, string outputPath, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default);
+    Task<Result<byte[]>> RedactToFileAsync(string inputPath, string outputPath, RedactionPlan plan, RenderOptions options, CancellationToken cancellationToken = default);
+}
+
 // Use Microsoft.Extensions.DependencyInjection abstractions
 // IServiceCollection, IServiceProvider, ServiceDescriptor, ServiceLifetime
 
