@@ -13,4 +13,5 @@
   <Project Name="EksimSafeCopy.Ocr.Tests" Path="tests\EksimSafeCopy.Ocr.Tests\EksimSafeCopy.Ocr.Tests.csproj" Guid="{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}" />
   <Project Name="EksimSafeCopy.Renderer.Tests" Path="tests\EksimSafeCopy.Renderer.Tests\EksimSafeCopy.Renderer.Tests.csproj" Guid="{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}" />
   <Project Name="EksimSafeCopy.Security.Tests" Path="tests\EksimSafeCopy.Security.Tests\EksimSafeCopy.Security.Tests.csproj" Guid="{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}" />
+  <Project Name="EksimSafeCopy.App.Tests" Path="tests\EksimSafeCopy.App.Tests\EksimSafeCopy.App.Tests.csproj" Guid="{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}" />
 </Solution>

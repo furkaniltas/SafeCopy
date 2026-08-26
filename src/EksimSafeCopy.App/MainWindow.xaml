@@ -1,0 +1,358 @@
+<Window x:Class="EksimSafeCopy.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:EksimSafeCopy.App.ViewModels"
+        xmlns:conv="clr-namespace:EksimSafeCopy.App.Converters"
+        mc:Ignorable="d"
+        Title="Eksim SafeCopy" Height="820" Width="1280"
+        WindowStartupLocation="CenterScreen"
+        Background="White">
+    <Window.Resources>
+        <conv:DetectionTypeConverter x:Key="DetectionTypeConverter"/>
+        <conv:ConfidenceLevelConverter x:Key="ConfidenceLevelConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="56"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header #0F2438 -->
+        <Grid Grid.Row="0" Background="#0F2438">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Logo block 34x34 #2F8F4E Radius 8 with EK -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Border Width="34" Height="34" Background="#2F8F4E" CornerRadius="8" VerticalAlignment="Center">
+                    <TextBlock Text="EK" Foreground="White" FontSize="14" FontWeight="ExtraBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Eksim SafeCopy" Foreground="White" FontSize="19" FontWeight="ExtraBold" LineHeight="20"/>
+                    <TextBlock Text="Güvenli PII Maskeleme - Tamamen Yerel" Foreground="#B7C4D0" FontSize="12.5" Opacity="0.95"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Header buttons -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                <Button Content="Dosya Seç" Command="{Binding OpenFileCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,0" Padding="16,7"/>
+                <Button Content="Yeni Tarama" Command="{Binding NewScanCommand}" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                <Button Content="İptal" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButtonStyle}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Body 3 columns: 300 left, * center, 300 right -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Detection list -->
+            <Border Grid.Column="0" BorderBrush="#E5E7EB" BorderThickness="0,0,1,0" Background="White">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                        <StackPanel>
+                            <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="#64748B" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="#2F8F4E"/>
+                            </StackPanel>
+                            <!-- Search box #16354D -->
+                            <TextBox x:Name="SearchBox" Margin="0,8,0,0" Padding="8,5" Background="#16354D" Foreground="White" BorderBrush="#33506A" BorderThickness="1" CaretBrush="White">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TextBox">
+                                                    <Border Background="#16354D" BorderBrush="#33506A" BorderThickness="1" CornerRadius="4" Padding="6,4">
+                                                        <ScrollViewer x:Name="PART_ContentHost"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <TextBlock Text="Ara (tip, değer)..." Foreground="#94A3B8" FontSize="10" Margin="2,-18,0,0" IsHitTestVisible="False" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ListView Grid.Row="1" ItemsSource="{Binding Detections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="8,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding DisplayType}" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438"/>
+                                                <Border Background="#EEF2FF" CornerRadius="4" Padding="4,1" Margin="6,0,0,0">
+                                                    <TextBlock Text="{Binding ConfidenceText}" FontSize="10" Foreground="#4F46E5"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding PageNumber, StringFormat='  Sayfa {0}'}" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Value}" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40"/>
+                                            <TextBlock Text="{Binding Location, StringFormat='Konum: {0}'}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+
+                    <Border Grid.Row="2" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="10" Background="#F8FAFC">
+                        <StackPanel>
+                            <Button Content="Maskele (Redact)" Command="{Binding RedactCommand}" Style="{StaticResource PrimaryButtonStyle}" Height="36" FontSize="13"/>
+                            <TextBlock Text="Orijinal dosya asla değiştirilmez. Çıktı ayrı dosyadır." FontSize="9" Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding OriginalHash, StringFormat='SHA256: {0}'}" FontSize="8" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding OriginalHash}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Center: Preview (Document model, not direct file) -->
+            <Grid Grid.Column="1" Background="#F1F5F9">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="12,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedFilePath, TargetNullValue='Dosya seçilmedi'}" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding CurrentDocument.Format, StringFormat='Format: {0}', TargetNullValue='Format: -'}" FontSize="10" Foreground="#64748B"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ProcessingState}" FontSize="10" Foreground="#33506A" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <ProgressBar Width="80" Height="6" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Unsupported message -->
+                <Border Grid.Row="1" Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" Margin="16" CornerRadius="8" Padding="16" VerticalAlignment="Top" Visibility="{Binding UnsupportedMessage, Converter={StaticResource BoolToVis}, ConverterParameter=Invert, FallbackValue=Collapsed}" >
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UnsupportedMessage}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ProcessingState}" Value="Unsupported">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Text="⚠ Desteklenmeyen Format" FontWeight="Bold" Foreground="#B91C1C" FontSize="13"/>
+                        <TextBlock Text="{Binding UnsupportedMessage}" Foreground="#7F1D1D" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        <TextBlock Text="Bu dosya için güvenli maskeleme yapılamadı ve çıktı oluşturulmadı. Lütfen dosyayı TXT/DOCX/XLSX/Görüntü formatına dönüştürün veya manuel redaksiyon uygulayın." Foreground="#991B1B" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" Margin="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <Grid>
+                        <Border Background="White" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1" Padding="16" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                            <TextBlock Text="{Binding PreviewText}" FontFamily="Consolas" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1" Padding="8" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="600"/>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- Status overlay when busy -->
+                <Border Grid.Row="1" Background="#F8FAFC" Opacity="0.85" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" IsHitTestVisible="False">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#334155" Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="400"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Right: Details -->
+            <Border Grid.Column="2" BorderBrush="#E5E7EB" BorderThickness="1,0,0,0" Background="White">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                        <TextBlock Text="Detay" FontWeight="Bold" FontSize="13"/>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" Padding="12" VerticalScrollBarVisibility="Auto">
+                        <StackPanel DataContext="{Binding SelectedDetection}">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+
+                            <TextBlock Text="Seçili tespit yok" Foreground="#94A3B8" FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.SelectedDetection, RelativeSource={RelativeSource AncestorType=Window}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <Border Background="#F1F5F9" CornerRadius="6" Padding="10" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DisplayType}" FontWeight="Bold" FontSize="14" Foreground="#0F2438"/>
+                                    <TextBlock Text="{Binding Value}" FontSize="12" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Border Background="#2F8F4E" CornerRadius="4" Padding="6,2">
+                                            <TextBlock Text="{Binding ConfidenceText}" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Confidence, StringFormat=' ({0:P0})'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="Ayrıntılar" FontWeight="SemiBold" FontSize="11" Foreground="#475569" Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Sayfa:" FontSize="11" Foreground="#64748B"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PageNumber}" FontSize="11" Foreground="#0F2438"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Güven:" FontSize="11" Foreground="#64748B"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfidenceText}" FontSize="11" Foreground="#0F2438"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Tip:" FontSize="11" Foreground="#64748B"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Type}" FontSize="11" Foreground="#0F2438"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="BBOX:" FontSize="11" Foreground="#64748B"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Location}" FontSize="10" Foreground="#0F2438" TextWrapping="Wrap"/>
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Bağlam:" FontSize="11" Foreground="#64748B"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Context}" FontSize="10" Foreground="#334155" TextWrapping="Wrap"/>
+                            </Grid>
+
+                            <CheckBox Content="Maskelenecek (IsSelected)" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,12,0,0" FontWeight="SemiBold"/>
+                            <TextBlock Text="CoordinateSystem ile bbox gösterimi merkez önizlemede işaretlidir." FontSize="9" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Verification display -->
+                    <Border Grid.Row="2" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12" Background="#F8FAFC">
+                        <StackPanel>
+                            <TextBlock Text="Doğrulama" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438"/>
+                            <TextBlock Text="{Binding VerificationResult.Passed, StringFormat='Geçti: {0}', TargetNullValue='Henüz doğrulanmadı'}" FontSize="11" Foreground="#475569" Margin="0,4,0,0"/>
+                            <TextBlock FontSize="11" Margin="0,2,0,0">
+                                <Run Text="Kalıntı: "/>
+                                <Run Text="{Binding VerificationResult.TotalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C" FontWeight="Bold"/>
+                                <Run Text=" | Kritik: "/>
+                                <Run Text="{Binding VerificationResult.CriticalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C"/>
+                            </TextBlock>
+                            <TextBlock Text="{Binding VerificationResult.VerifiedAt, StringFormat='Zaman: {0:HH:mm:ss}', TargetNullValue=''}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                            <Button Content="Çıktıyı Aç" Command="{Binding OpenOutputCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,8,0,0" Padding="8,4" FontSize="11"/>
+                            <TextBlock Text="{Binding OutputPath}" FontSize="8" Foreground="#64748B" TextTrimming="CharacterEllipsis" ToolTip="{Binding OutputPath}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ProgressBar Width="100" Height="6" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ProcessingState}" FontSize="10" Foreground="#64748B" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding VerificationResult.Passed, StringFormat='Doğrulama: {0}', TargetNullValue=''}" FontSize="10" Foreground="#2F8F4E" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Footer #FAFBFC with 4 groups horizontally centered, 7x7 dots, 26px gap -->
+        <Grid Grid.Row="3" Background="#FAFBFC">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <!-- Group 1 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
+                    <Ellipse Width="7" Height="7" Fill="#2F8F4E" VerticalAlignment="Center"/>
+                    <TextBlock Text="Eksim Enerji" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <!-- Group 2 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
+                    <Ellipse Width="7" Height="7" Fill="#0F2438" VerticalAlignment="Center"/>
+                    <TextBlock Text="Tamamen Yerel" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <!-- Group 3 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
+                    <Ellipse Width="7" Height="7" Fill="#33506A" VerticalAlignment="Center"/>
+                    <TextBlock Text="Bulut Yok" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <!-- Group 4 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="7" Height="7" Fill="#16354D" VerticalAlignment="Center"/>
+                    <TextBlock Text="Güvenli Maskeleme" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

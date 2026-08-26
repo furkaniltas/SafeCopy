@@ -305,33 +305,35 @@ OCR only activates when needed.
 
 ---
 
-# Phase 8 — Detection UI and Document Preview
+# Phase 6/8 — Preview / Selection UI — Finalized 2026-08-26
 
-- [ ] Main window
-- [ ] Windows 11 layout
-- [ ] Corporate header
-- [ ] Eksim SafeCopy logo
-- [ ] Drag & Drop
-- [ ] File selection
-- [ ] Supported format indicators
-- [ ] Processing status
-- [ ] Document preview
-- [ ] Zoom
-- [ ] Page navigation
-- [ ] Detection highlighting
-- [ ] Detection selection
-- [ ] Detection type panel
-- [ ] Confidence indicator
-- [ ] Finding counters
-- [ ] Selected/disabled state
-- [ ] Right-side review panel
-- [ ] Manual data addition
-- [ ] "Mask all repetitions"
-- [ ] "Remove mask"
-- [ ] User warning dialogs
-- [ ] Keyboard accessibility
-- [ ] High DPI
-- [ ] Windows 11 visual validation
+Evidence: `src/EksimSafeCopy.App/` WPF MVVM, `MainWindow.xaml` header #0F2438 + #2F8F4E 34x34, footer #FAFBFC, 3-column body; `MainViewModel.cs` async pipeline `IDocumentEngine → IDetectionEngine → IRenderer/IRedactionPlanner/IVerificationEngine` via DI; VSTest 394/394, EXE launch verified.
+
+- [x] Main window (`App.xaml`, `MainWindow.xaml`, `MainViewModel.cs:30`)
+- [x] Windows 11 layout (dark navy header, white workspace, footer strip)
+- [x] Corporate header (`MainWindow.xaml:15` Header Grid #0F2438)
+- [x] Eksim SafeCopy logo (34x34 #2F8F4E EK 800 14px + title 19px 800 + subtitle #B7C4D0)
+- [~] Drag & Drop — not yet, file selection via dialog only (future)
+- [x] File selection (`IFileDialogService` → `OpenFileDialog` filter PDF/DOCX/XLSX/TXT/UDF/PNG/JPEG/TIFF/BMP, `MainViewModel.OpenFileAsync:209`)
+- [x] Supported format indicators (filter + DocumentEngine format validation, not only UI)
+- [x] Processing status (`ProcessingState` enum Idle/Loading/Detecting/Ready/Redacting/Verifying/Success/Failed/Unsupported/Cancelled + `StatusMessage`)
+- [x] Document preview (from `Document` model `PreviewText` + `PreviewImage`, `BuildPreviewAsync:585` with `CoordinateSystem.Normalize`)
+- [~] Zoom — not yet (preview is text/image, no zoom control)
+- [~] Page navigation — not yet (single preview text with page headers)
+- [~] Detection highlighting — preview shows bbox markers as text (`UpdatePreviewWithMarkersAsync:641` with `CoordinateSystem`), no canvas overlay yet
+- [x] Detection selection (`DetectionItemViewModel.IsSelected` → `DetectionState`, `CanRedact` checks `Any(IsSelected)`)
+- [x] Detection type panel (left ListView: type, value, confidence, page, checkbox)
+- [x] Confidence indicator (`MapConfidence` High/Medium/Low from `ConfidenceLevel`, `DetectionTypeConverter`)
+- [x] Finding counters (`HasDetections`, `SelectedCount`)
+- [x] Selected/disabled state (checkbox + `CanRedact` disables when Unsupported/Busy)
+- [x] Right-side review panel (selected detection details, bbox, confidence, page)
+- [~] Manual data addition — not yet (custom detection via existing pipeline, UI not yet)
+- [~] "Mask all repetitions" — planner handles duplicates, UI not yet explicit button
+- [~] "Remove mask" — selection toggle covers, no dedicated remove
+- [x] User warning dialogs (unsupported PDF/UDF → `UnsupportedMessage` "PDF redaction şu anda güvenli olarak desteklenmiyor.", verification failure → `Passed=false` not presented as success)
+- [x] Keyboard accessibility (commands, focusable controls)
+- [x] High DPI (WPF native, `UseWPF` + `app.manifest` DPI aware)
+- [x] Windows 11 visual validation (header/footer colors, 3-column layout verified via EXE launch)
 
 ---
 
