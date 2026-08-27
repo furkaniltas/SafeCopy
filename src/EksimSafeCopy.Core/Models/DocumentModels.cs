@@ -698,8 +698,10 @@ public sealed class VerificationResult
     public IReadOnlyList<string> HiddenContentIssues { get; init; } = Array.Empty<string>();
     public TimeSpan ScanDuration { get; init; }
     public DateTime VerifiedAt { get; init; } = DateTime.UtcNow;
-    public int CriticalResidualCount => ResidualDetections.Count(r => r.IsCritical);
-    public int TotalResidualCount => ResidualDetections.Count;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int CriticalResidualCount { get => ResidualDetections.Count(r => r.IsCritical); set { } }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int TotalResidualCount { get => ResidualDetections.Count; set { } }
 }
 
 public sealed class ResidualDetection

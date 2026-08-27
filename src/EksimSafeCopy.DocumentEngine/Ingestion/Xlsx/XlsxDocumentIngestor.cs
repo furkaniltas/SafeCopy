@@ -159,14 +159,16 @@ public sealed class XlsxDocumentIngestor : DocumentIngestorBase
             if (string.IsNullOrWhiteSpace(cellValue)) continue;
 
             var cellAddress = cell.CellReference?.Value ?? string.Empty;
+            var currentOrder = orderIndex++;
             var block = new TextBlock
             {
                 Text = $"{cellAddress}: {cellValue}",
                 Type = TextBlockType.Table,
                 Direction = TextDirection.LeftToRight,
-                OrderIndex = orderIndex++,
+                OrderIndex = currentOrder,
                 PageNumber = 1,
                 BoundingBox = BoundingBox.Empty,
+                Properties = new Dictionary<string, object> { ["CellReference"] = cellAddress },
                 Spans = new List<TextSpan>
                 {
                     new TextSpan
@@ -174,14 +176,18 @@ public sealed class XlsxDocumentIngestor : DocumentIngestorBase
                         StartIndex = 0,
                         Length = cellAddress.Length + 2,
                         Text = $"{cellAddress}: ",
-                        BoundingBox = BoundingBox.Empty
+                        BoundingBox = BoundingBox.Empty,
+                        BlockId = currentOrder,
+                        Properties = new Dictionary<string, object> { ["CellReference"] = cellAddress, ["IsAddress"] = true }
                     },
                     new TextSpan
                     {
                         StartIndex = cellAddress.Length + 2,
                         Length = cellValue.Length,
                         Text = cellValue,
-                        BoundingBox = BoundingBox.Empty
+                        BoundingBox = BoundingBox.Empty,
+                        BlockId = currentOrder,
+                        Properties = new Dictionary<string, object> { ["CellReference"] = cellAddress, ["IsAddress"] = false }
                     }
                 }
             };

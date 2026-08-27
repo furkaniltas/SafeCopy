@@ -42,7 +42,9 @@ public sealed class XlsxRedactor : IRedactor
             var sharedStringPart = workbookPart.SharedStringTablePart;
             var sharedStringTable = sharedStringPart?.SharedStringTable;
 
-            // Process shared strings via search-based replacement
+            // Process shared strings: for entries that exactly match PII, replace them.
+            // For shared strings that are substrings of PII or vice versa, per-cell handling below will handle precise cell conversion.
+            // This ensures sharedStrings.xml is also sanitized for the simple case where each PII is a distinct shared string entry.
             if (sharedStringTable != null)
             {
                 foreach (var sharedStringItem in sharedStringTable.Elements<SharedStringItem>())

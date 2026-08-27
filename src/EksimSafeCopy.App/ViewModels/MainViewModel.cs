@@ -131,6 +131,7 @@ public sealed class MainViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(CanStartBatch));
                 OnPropertyChanged(nameof(CanRetryFailed));
+                System.Windows.Input.CommandManager.InvalidateRequerySuggested();
             }
         }
     }
@@ -244,6 +245,8 @@ public sealed class MainViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(CanRedact));
                 OnPropertyChanged(nameof(CanStartBatch));
+                OnPropertyChanged(nameof(CanRetryFailed));
+                System.Windows.Input.CommandManager.InvalidateRequerySuggested();
             }
         }
     }
@@ -561,6 +564,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BatchCancelledCount));
         OnPropertyChanged(nameof(CanStartBatch));
         OnPropertyChanged(nameof(CanRetryFailed));
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
     }
 
     private async Task OpenFileAsync()
@@ -715,6 +719,7 @@ public sealed class MainViewModel : ViewModelBase
                         {
                             OnPropertyChanged(nameof(SelectedCount));
                             OnPropertyChanged(nameof(CanRedact));
+                            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
                         }
                     };
                     Detections.Add(vm);
@@ -722,6 +727,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasDetections));
                 OnPropertyChanged(nameof(SelectedCount));
                 OnPropertyChanged(nameof(CanRedact));
+                System.Windows.Input.CommandManager.InvalidateRequerySuggested();
             }).ConfigureAwait(false);
 
             // Update preview with bbox markers using CoordinateSystem
@@ -912,11 +918,25 @@ public sealed class MainViewModel : ViewModelBase
             var verification = verifyResult.Value;
             await RunOnUiAsync(() => VerificationResult = verification).ConfigureAwait(false);
 
-            if (!verification.Passed)
+            // Enforce 10 SUCCESS invariants before claiming success
+            bool outputExists = File.Exists(outputPath);
+            bool outputDifferent = !string.Equals(outputPath, SelectedFilePath, StringComparison.OrdinalIgnoreCase) && outputExists;
+            var finalHashCheck = await Task.Run(() => _fileSystem.ComputeHash(SelectedFilePath!, HashAlgorithm.SHA256), token).ConfigureAwait(false);
+            bool hashPreserved = finalHashCheck.IsSuccess && OriginalHash != null && finalHashCheck.Value == OriginalHash;
+            bool passed = verification.Passed;
+            bool zeroResidual = verification.TotalResidualCount == 0;
+            bool zeroCritical = verification.CriticalResidualCount == 0;
+            bool noMetadata = verification.MetadataIssues.Count == 0;
+            bool noHidden = verification.HiddenContentIssues.Count == 0;
+
+            bool allInvariants = outputExists && outputDifferent && hashPreserved && passed && zeroResidual && zeroCritical && noMetadata && noHidden;
+
+            if (!allInvariants)
             {
                 ProcessingState = ProcessingState.Failed;
-                StatusMessage = $"GÜVENLİK DOĞRULAMASI BAŞARISIZ: {verification.TotalResidualCount} kalıntı PII bulundu. Güvenli kopya hazır değil.";
-                // Do not claim success when residual PII found
+                StatusMessage = $"GÜVENLİK DOĞRULAMASI BAŞARISIZ: residual={verification.TotalResidualCount}, critical={verification.CriticalResidualCount}, metadata={verification.MetadataIssues.Count}, hidden={verification.HiddenContentIssues.Count}, outputExists={outputExists}, hashPreserved={hashPreserved}. Güvenli kopya hazır değil.";
+                // Clean up insecure output
+                try { if (File.Exists(outputPath)) File.Delete(outputPath); OutputPath = null; } catch { }
                 return;
             }
 

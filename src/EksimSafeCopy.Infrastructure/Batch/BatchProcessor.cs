@@ -635,9 +635,49 @@ public sealed class BatchProcessor : IBatchProcessor
                 };
             }
 
-            // Compute OutputHash
+            // Compute OutputHash and enforce 10 SUCCESS invariants
             var outHashResult = await Task.Run(() => _fileSystem.ComputeHash(outputPath, CoreHashAlgorithm.SHA256), cancellationToken).ConfigureAwait(false);
             if (outHashResult.IsSuccess) outputHash = outHashResult.Value;
+
+            // Enforce SUCCESS invariants: output must exist, be different from input, hash preserved, verification passed with 0 residual, no exception
+            bool outputExists = File.Exists(outputPath);
+            bool outputDifferentFromInput = !string.Equals(outputPath, inputPath, StringComparison.OrdinalIgnoreCase) && outputExists;
+            bool hashPreserved = postHash.IsSuccess && originalHash != null && postHash.Value == originalHash;
+            bool verificationPassed = verification.Passed;
+            bool zeroResidual = verification.TotalResidualCount == 0;
+            bool zeroCritical = verification.CriticalResidualCount == 0;
+            bool noMetadataIssues = verification.MetadataIssues.Count == 0;
+            bool noHiddenIssues = verification.HiddenContentIssues.Count == 0;
+            bool outputHashExists = !string.IsNullOrEmpty(outputHash);
+
+            bool allInvariants = outputExists && outputDifferentFromInput && hashPreserved && verificationPassed && zeroResidual && zeroCritical && noMetadataIssues && noHiddenIssues && outputHashExists;
+
+            if (!allInvariants)
+            {
+                // Invariant failure → treat as Failed, delete output, do not present as success
+                var invariantError = Error.SecurityError(
+                    $"SUCCESS invariant failure: outputExists={outputExists}, different={outputDifferentFromInput}, hashPreserved={hashPreserved}, passed={verificationPassed}, residual={verification.TotalResidualCount}, critical={verification.CriticalResidualCount}, metadata={verification.MetadataIssues.Count}, hidden={verification.HiddenContentIssues.Count}, outputHashExists={outputHashExists}");
+                TryDeleteFile(outputPath);
+                TryDeleteFile(tempOutput);
+                sw.Stop();
+                Report(BatchItemState.Failed, invariantError.Message, invariantError, ver: verification, dets: detections, dur: sw.Elapsed);
+                CleanupTempWorkspace(tempWorkspace);
+                return new BatchItem
+                {
+                    Id = id,
+                    InputPath = inputPath,
+                    FileName = Path.GetFileName(inputPath),
+                    DetectedFormat = detectedFormat,
+                    State = BatchItemState.Failed,
+                    StatusMessage = invariantError.Message,
+                    Error = invariantError,
+                    VerificationResult = verification,
+                    Detections = detections,
+                    OriginalHash = originalHash,
+                    CreatedAt = DateTime.UtcNow,
+                    Duration = sw.Elapsed
+                };
+            }
 
             sw.Stop();
             Report(BatchItemState.Success, "Tamamlandı", outPath: outputPath, ver: verification, dets: detections, dur: sw.Elapsed);
