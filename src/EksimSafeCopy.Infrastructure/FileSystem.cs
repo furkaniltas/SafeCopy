@@ -208,12 +208,21 @@ public sealed class SecureTempWorkspace : ITempWorkspace
         _fileSystem = fileSystem;
         _sessionId = Guid.NewGuid().ToString("N");
         _rootPath = Path.Combine(Path.GetTempPath(), "EksimSafeCopy", _sessionId);
-        
+
+        // Create root first with secure ACL, then sub-directories.
+        _fileSystem.CreateDirectory(_rootPath);
+        SetSecureAcl(_rootPath);
+
         foreach (var dir in new[] { InputPath, ExtractedPath, OcrPath, OutputPath, VerificationPath })
         {
             _fileSystem.CreateDirectory(dir);
             SetSecureAcl(dir);
         }
+    }
+
+    ~SecureTempWorkspace()
+    {
+        try { Cleanup(); } catch { /* finalizer must not throw */ }
     }
     
     private void SetSecureAcl(string path)
@@ -332,9 +341,17 @@ public sealed class SecureTempWorkspace : ITempWorkspace
         return await Task.Run(Cleanup).ConfigureAwait(false);
     }
     
-    public void Dispose() => Cleanup();
-    
-    public async ValueTask DisposeAsync() => await CleanupAsync();
+    public void Dispose()
+    {
+        Cleanup();
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await CleanupAsync().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
+    }
     
     public static void CleanupStaleWorkspaces(TimeSpan maxAge)
     {

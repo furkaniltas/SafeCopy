@@ -405,22 +405,24 @@ Acceptance: `Output with PII residue cannot be presented as safe copy.` — veri
 
 ---
 
-# Phase 11 — Privacy and Local-Only Security
+# Phase 11 — Privacy and Local-Only Security — Finalized 2026-08-27
 
-- [ ] Network dependency audit
-- [ ] HTTP/HTTPS call absence verified
-- [ ] DNS dependency check
-- [ ] Telemetry absence verified
-- [ ] Analytics absence verified
-- [ ] Cloud OCR absence verified
-- [ ] External AI API absence verified
-- [ ] Temp workspace security review
-- [ ] Temp cleanup test
-- [ ] Crash cleanup test
-- [ ] Original file hash verification
-- [ ] Output independence verification
-- [ ] Windows Firewall outbound test
-- [ ] Offline Windows 11 test
+Evidence: `docs/security/LOCAL_ONLY_AUDIT.md` + `src/EksimSafeCopy.Infrastructure/FileSystem.cs:206` SecureTempWorkspace ACL + VSTest 432/432, `Security.Tests 16/16`.
+
+- [x] Network dependency audit (`LOCAL_ONLY_AUDIT.md §3.2` `Select-String src/**/*.cs` 0 hits for HttpClient/WebClient/RestSharp/TcpClient)
+- [x] HTTP/HTTPS call absence verified (no `http(s)://` outbound literals, `Network_NoHttpOrHttpsLiteralForOutbound`)
+- [x] DNS dependency check (no `Dns.` / `System.Net` outbound, `Network_NoDnsLookupInSrc`)
+- [x] Telemetry absence verified (no ApplicationInsights, `Telemetry_NoAnalyticsPackages`)
+- [x] Analytics absence verified (no Segment/Mixpanel/Analytics, `csproj` allowlist)
+- [x] Cloud OCR absence verified (no CognitiveServices/Textract, `CloudOcr_Absence`)
+- [x] External AI API absence verified (no OpenAI/Anthropic/Gemini, `ExternalAi_Absence`)
+- [x] Temp workspace security review (`FileSystem.cs:214` ACL `SetAccessRuleProtection`, GUID isolation, `LOCAL_ONLY_AUDIT.md §10`)
+- [x] Temp cleanup test (`TempWorkspace_IsolationAndCleanup`, `TempCleanup_OnSuccess`)
+- [x] Crash cleanup test (`TempCleanup_CrashCleanup_StaleRemovesOldAndKeepsRecent`, finalizer `~SecureTempWorkspace`)
+- [x] Original file hash verification (`OriginalHash_Verification`, SHA256 `FileSystem.ComputeHash` before/after)
+- [x] Output independence verification (`OutputIndependence_NotOverwriteOriginal`, output distinct file)
+- [x] Windows Firewall outbound test (`LOCAL_ONLY_AUDIT.md §15` manual `pfirewall.log` procedure documented)
+- [x] Offline Windows 11 test (`LOCAL_ONLY_AUDIT.md §16` Airplane-mode VM procedure)
 
 ---
 
