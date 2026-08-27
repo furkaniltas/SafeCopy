@@ -3,17 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:vm="clr-namespace:EksimSafeCopy.App.ViewModels"
-        xmlns:conv="clr-namespace:EksimSafeCopy.App.Converters"
         mc:Ignorable="d"
-        Title="Eksim SafeCopy" Height="900" Width="1280"
+        Title="Eksim SafeCopy" Height="900" Width="1280" MinWidth="1024" MinHeight="700"
         WindowStartupLocation="CenterScreen"
-        Background="White">
+        Background="{StaticResource PageBackground}"
+        TextOptions.TextFormattingMode="Display">
     <Window.Resources>
-        <conv:DetectionTypeConverter x:Key="DetectionTypeConverter"/>
-        <conv:ConfidenceLevelConverter x:Key="ConfidenceLevelConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -21,11 +17,11 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="32"/>
-            <RowDefinition Height="56"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header #0F2438 -->
-        <Grid Grid.Row="0" Background="#0F2438">
+        <Grid Grid.Row="0" Background="{StaticResource HeaderBackground}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -34,25 +30,25 @@
 
             <!-- Logo block 34x34 #2F8F4E Radius 8 with EK -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                <Border Width="34" Height="34" Background="#2F8F4E" CornerRadius="8" VerticalAlignment="Center">
+                <Border Width="34" Height="34" Background="{StaticResource PrimaryGreen}" CornerRadius="8" VerticalAlignment="Center">
                     <TextBlock Text="EK" Foreground="White" FontSize="14" FontWeight="ExtraBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="Eksim SafeCopy" Foreground="White" FontSize="19" FontWeight="ExtraBold" LineHeight="20"/>
-                    <TextBlock Text="Güvenli PII Maskeleme - Tamamen Yerel" Foreground="#B7C4D0" FontSize="12.5" Opacity="0.95"/>
+                    <TextBlock Text="Güvenli PII Maskeleme - Tamamen Yerel" Foreground="{StaticResource SubtitleForeground}" FontSize="12.5" Opacity="0.95"/>
                 </StackPanel>
             </StackPanel>
 
-            <!-- Header buttons -->
+            <!-- Header buttons - improved spacing, hover/pressed/focus via styles -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                <Button Content="Dosya Seç" Command="{Binding OpenFileCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,0" Padding="16,7"/>
-                <Button Content="Yeni Tarama" Command="{Binding NewScanCommand}" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
-                <Button Content="İptal" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButtonStyle}" />
+                <Button Content="Dosya Seç" Command="{Binding OpenFileCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,0" Padding="16,7" ToolTip="Desteklenen bir dosya seçin (PDF, DOCX, XLSX, TXT, UDF, Görsel)"/>
+                <Button Content="Yeni Tarama" Command="{Binding NewScanCommand}" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" ToolTip="Mevcut taramayı temizle ve yeni dosya seç"/>
+                <Button Content="İptal" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButtonStyle}" ToolTip="Çalışan işlemi iptal et"/>
             </StackPanel>
         </Grid>
 
-        <!-- Batch Queue Panel -->
-        <Border Grid.Row="1" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+        <!-- Batch Queue Panel - compact, professional -->
+        <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -60,23 +56,32 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Batch toolbar -->
+                <!-- Batch toolbar - reduced padding -->
                 <Grid Grid.Row="0" Background="#F8FAFC" Margin="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,8">
-                        <TextBlock Text="Toplu İşlem Kuyruğu" FontWeight="Bold" FontSize="13" Foreground="#0F2438" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding BatchTotalCount, StringFormat=' ({0} dosya)'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                        <TextBlock Text="{Binding BatchSuccessCount, StringFormat=' Başarılı: {0}'}" FontSize="11" Foreground="#2F8F4E" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                        <TextBlock Text="{Binding BatchFailedCount, StringFormat=' Başarısız: {0}'}" FontSize="11" Foreground="#B91C1C" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                        <TextBlock Text="{Binding BatchUnsupportedCount, StringFormat=' Desteklenmiyor: {0}'}" FontSize="11" Foreground="#D97706" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                        <TextBlock Text="{Binding BatchCancelledCount, StringFormat=' İptal: {0}'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,6">
+                        <TextBlock Text="Toplu İşlem Kuyruğu" FontWeight="Bold" FontSize="12" Foreground="#0F2438" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BatchTotalCount, StringFormat=' ({0} dosya)'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                            <Ellipse Width="7" Height="7" Fill="{StaticResource PrimaryGreen}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BatchSuccessCount, StringFormat=' Başarılı: {0}'}" FontSize="11" Foreground="#2F8F4E" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                            <Ellipse Width="7" Height="7" Fill="#B91C1C" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BatchFailedCount, StringFormat=' Başarısız: {0}'}" FontSize="11" Foreground="#B91C1C" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                            <Ellipse Width="7" Height="7" Fill="{StaticResource DicleOrange}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BatchUnsupportedCount, StringFormat=' Desteklenmiyor: {0}'}" FontSize="11" Foreground="#D97706" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding BatchCancelledCount, StringFormat=' İptal: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <Button Content="Dosya Ekle" Command="{Binding AddFilesToBatchCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="12,5" Margin="0,0,6,0" FontSize="11"/>
-                        <Button Content="Başlat" Command="{Binding StartBatchCommand}" Background="#2F8F4E" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                        <Button Content="Dosya Ekle" Command="{Binding AddFilesToBatchCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="12,5" Margin="0,0,6,0" FontSize="11" ToolTip="Çoklu dosya ekle (PDF, DOCX, XLSX, TXT, UDF, Görsel)"/>
+                        <Button Content="Başlat" Command="{Binding StartBatchCommand}" Background="{StaticResource PrimaryGreen}" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand" ToolTip="Kuyruktaki dosyaları toplu işle">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
@@ -85,7 +90,7 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        <Button Content="İptal Et" Command="{Binding CancelBatchCommand}" Background="#64748B" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                        <Button Content="İptal Et" Command="{Binding CancelBatchCommand}" Background="#64748B" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand" ToolTip="Toplu işlemi iptal et">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
@@ -94,7 +99,7 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        <Button Content="Başarısızları Yeniden Dene" Command="{Binding RetryFailedCommand}" Background="White" Foreground="#0F2438" BorderBrush="#E5E7EB" BorderThickness="1" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                        <Button Content="Başarısızları Yeniden Dene" Command="{Binding RetryFailedCommand}" Background="White" Foreground="#0F2438" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand" ToolTip="Başarısız dosyaları yeniden kuyruğa al">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
@@ -103,7 +108,7 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        <Button Content="Temizle" Command="{Binding ClearBatchCommand}" Background="White" Foreground="#B91C1C" BorderBrush="#FECACA" BorderThickness="1" Padding="12,5" FontSize="11" Cursor="Hand">
+                        <Button Content="Temizle" Command="{Binding ClearBatchCommand}" Background="White" Foreground="#B91C1C" BorderBrush="#FECACA" BorderThickness="1" Padding="12,5" FontSize="11" Cursor="Hand" ToolTip="Kuyruğu temizle">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
@@ -115,15 +120,15 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Batch ListView queue with columns -->
-                <Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0">
-                    <ListView ItemsSource="{Binding BatchItems}" BorderThickness="0" MaxHeight="160" MinHeight="80" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <!-- Batch ListView compact - MaxHeight 120 -->
+                <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0">
+                    <ListView ItemsSource="{Binding BatchItems}" BorderThickness="0" MaxHeight="120" MinHeight="60" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn Header="Dosya" Width="220">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding FileName}" FontSize="11" Foreground="#0F2438" ToolTip="{Binding InputPath}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding FileName}" FontSize="11" Foreground="{StaticResource BodyTextBrush}" ToolTip="{Binding InputPath}" TextTrimming="CharacterEllipsis"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -138,7 +143,7 @@
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding State}" Value="Success"><Setter Property="Fill" Value="#2F8F4E"/></DataTrigger>
                                                                 <DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Fill" Value="#B91C1C"/></DataTrigger>
-                                                                <DataTrigger Binding="{Binding State}" Value="Unsupported"><Setter Property="Fill" Value="#D97706"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Unsupported"><Setter Property="Fill" Value="#D9622B"/></DataTrigger>
                                                                 <DataTrigger Binding="{Binding State}" Value="Processing"><Setter Property="Fill" Value="#2563EB"/></DataTrigger>
                                                                 <DataTrigger Binding="{Binding State}" Value="Queued"><Setter Property="Fill" Value="#94A3B8"/></DataTrigger>
                                                                 <DataTrigger Binding="{Binding State}" Value="Cancelled"><Setter Property="Fill" Value="#64748B"/></DataTrigger>
@@ -151,28 +156,28 @@
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="Tespit" Width="90">
+                                <GridViewColumn Header="Tespit" Width="80">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding DetectionSummary}" FontSize="11" Foreground="#475569" HorizontalAlignment="Center"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="Doğrulama" Width="100">
+                                <GridViewColumn Header="Doğrulama" Width="90">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding VerificationSummary}" FontSize="11" Foreground="#334155"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="Çıktı" Width="240">
+                                <GridViewColumn Header="Çıktı" Width="220">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding OutputPath}" FontSize="10" Foreground="#64748B" ToolTip="{Binding OutputPath}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding OutputPath}" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}" ToolTip="{Binding OutputPath}" TextTrimming="CharacterEllipsis"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="Mesaj" Width="200">
+                                <GridViewColumn Header="Mesaj" Width="180">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding StatusMessage}" FontSize="10" Foreground="#94A3B8" ToolTip="{Binding StatusMessage}" TextTrimming="CharacterEllipsis"/>
@@ -184,7 +189,8 @@
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Padding" Value="2"/>
+                                <Setter Property="Padding" Value="4,3"/>
+                                <Setter Property="MinHeight" Value="22"/>
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
                                         <ContextMenu>
@@ -198,33 +204,33 @@
                     </ListView>
                 </Border>
 
-                <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+                <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="10,5">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ProgressBar Width="100" Height="6" IsIndeterminate="True" Visibility="{Binding IsBatchProcessing, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding BatchStatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                            <TextBlock Text=" | Sürükle &amp; Bırak ile çoklu dosya ekleyebilirsiniz." FontSize="10" Foreground="#94A3B8" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Width="90" Height="5" IsIndeterminate="True" Visibility="{Binding IsBatchProcessing, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding BatchStatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="500"/>
+                            <TextBlock Text="Sürükle &amp; Bırak ile çoklu dosya ekleyebilirsiniz." FontSize="10" Foreground="#94A3B8" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="Orijinal dosyalar asla üzerine yazılmaz." FontSize="10" Foreground="#2F8F4E" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Orijinal dosyalar asla üzerine yazılmaz." FontSize="10" Foreground="{StaticResource PrimaryGreen}" VerticalAlignment="Center" FontStyle="Italic"/>
                     </Grid>
                 </Border>
             </Grid>
         </Border>
 
-        <!-- Body 3 columns: 300 left, * center, 300 right -->
+        <!-- Body 3 columns: 300 left, * center, 300 right - responsive via MinWidth -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="300" MinWidth="260"/>
+                <ColumnDefinition Width="*" MinWidth="400"/>
+                <ColumnDefinition Width="300" MinWidth="260"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Detection list -->
-            <Border Grid.Column="0" BorderBrush="#E5E7EB" BorderThickness="0,0,1,0" Background="White">
+            <!-- Left: Tespitler -->
+            <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,1,0" Background="White">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -232,53 +238,69 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1">
                         <StackPanel>
-                            <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13"/>
+                            <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="#64748B" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="#2F8F4E"/>
+                                <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
                             </StackPanel>
                             <!-- Search box #16354D -->
-                            <TextBox x:Name="SearchBox" Margin="0,8,0,0" Padding="8,5" Background="#16354D" Foreground="White" BorderBrush="#33506A" BorderThickness="1" CaretBrush="White">
-                                <TextBox.Style>
-                                    <Style TargetType="TextBox">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="TextBox">
-                                                    <Border Background="#16354D" BorderBrush="#33506A" BorderThickness="1" CornerRadius="4" Padding="6,4">
-                                                        <ScrollViewer x:Name="PART_ContentHost"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </TextBox.Style>
-                            </TextBox>
-                            <TextBlock Text="Ara (tip, değer)..." Foreground="#94A3B8" FontSize="10" Margin="2,-18,0,0" IsHitTestVisible="False" Visibility="Collapsed"/>
+                            <Border Margin="0,8,0,0" Background="{StaticResource SearchBackground}" BorderBrush="{StaticResource BorderBlue}" BorderThickness="1" CornerRadius="4" Padding="8,5">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Ara (tip, değer)..." Foreground="{StaticResource PlaceholderBrush}" FontSize="11" IsHitTestVisible="False" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBox x:Name="SearchBox" Background="Transparent" Foreground="White" BorderThickness="0" CaretBrush="White" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="⌕" Foreground="{StaticResource PlaceholderBrush}" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                     </Border>
 
-                    <ListView Grid.Row="1" ItemsSource="{Binding Detections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListView Grid.Row="1" ItemsSource="{Binding Detections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="8,8">
+                                <Border BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="10,8" Background="White">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Background" Value="#F0FDF4"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" Margin="0,2,8,0" ToolTip="Maskelenecek olarak seç"/>
                                         <StackPanel Grid.Column="1">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding DisplayType}" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438"/>
-                                                <Border Background="#EEF2FF" CornerRadius="4" Padding="4,1" Margin="6,0,0,0">
-                                                    <TextBlock Text="{Binding ConfidenceText}" FontSize="10" Foreground="#4F46E5"/>
+                                                <Border Background="#EEF2FF" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" BorderBrush="#C7D2FE" BorderThickness="1">
+                                                    <TextBlock Text="{Binding ConfidenceText}" FontSize="10" Foreground="#4338CA" FontWeight="SemiBold"/>
                                                 </Border>
-                                                <TextBlock Text="{Binding PageNumber, StringFormat='  Sayfa {0}'}" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                <TextBlock Text="{Binding PageNumber, StringFormat='  Sayfa {0}'}" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0"/>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Value}" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40"/>
-                                            <TextBlock Text="{Binding Location, StringFormat='Konum: {0}'}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding Value}" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding Location, StringFormat='Konum: {0}'}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -289,53 +311,56 @@
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                        <Setter Property="Background" Value="#F8FAFC"/>
+                                    </Trigger>
+                                </Style.Triggers>
                             </Style>
                         </ListView.ItemContainerStyle>
                     </ListView>
 
-                    <Border Grid.Row="2" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="10" Background="#F8FAFC">
+                    <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12,10" Background="#F8FAFC">
                         <StackPanel>
-                            <Button Content="Maskele (Redact)" Command="{Binding RedactCommand}" Style="{StaticResource PrimaryButtonStyle}" Height="36" FontSize="13"/>
-                            <TextBlock Text="Orijinal dosya asla değiştirilmez. Çıktı ayrı dosyadır." FontSize="9" Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                            <Button Content="Güvenli Kopya Oluştur" Command="{Binding RedactCommand}" Style="{StaticResource PrimaryButtonStyle}" Height="38" FontSize="13" FontWeight="SemiBold" ToolTip="Seçili PII'leri maskeleyerek güvenli kopya oluştur (orijinal değişmez)"/>
+                            <TextBlock Text="Orijinal dosya asla değiştirilmez. Çıktı ayrı dosya olarak oluşturulur." FontSize="9" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                             <TextBlock Text="{Binding OriginalHash, StringFormat='SHA256: {0}'}" FontSize="8" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding OriginalHash}"/>
                         </StackPanel>
                     </Border>
                 </Grid>
             </Border>
 
-            <!-- Center: Preview (Document model, not direct file) -->
+            <!-- Center: Önizleme - professional empty state -->
             <Grid Grid.Column="1" Background="#F1F5F9">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="12,8">
+                <Border Grid.Row="0" Background="White" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="12,8">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="{Binding SelectedFilePath, TargetNullValue='Dosya seçilmedi'}" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding CurrentDocument.Format, StringFormat='Format: {0}', TargetNullValue='Format: -'}" FontSize="10" Foreground="#64748B"/>
+                            <TextBlock Text="{Binding SelectedFilePath, TargetNullValue='Henüz dosya seçilmedi'}" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding CurrentDocument.Format, StringFormat='Format: {0}', TargetNullValue='Format: -'}" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="{Binding ProcessingState}" FontSize="10" Foreground="#33506A" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <ProgressBar Width="80" Height="6" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            <ProgressBar Width="80" Height="5" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource {x:Type ProgressBar}}" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <!-- Unsupported message -->
-                <Border Grid.Row="1" Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" Margin="16" CornerRadius="8" Padding="16" VerticalAlignment="Top" Visibility="{Binding UnsupportedMessage, Converter={StaticResource BoolToVis}, ConverterParameter=Invert, FallbackValue=Collapsed}" >
+                <Border Grid.Row="1" Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" Margin="16" CornerRadius="8" Padding="16" VerticalAlignment="Top" >
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding UnsupportedMessage}" Value="{x:Null}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
                                 <DataTrigger Binding="{Binding ProcessingState}" Value="Unsupported">
                                     <Setter Property="Visibility" Value="Visible"/>
                                 </DataTrigger>
@@ -349,19 +374,65 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Empty state - professional, not just "Dosya seçilmedi" -->
+                <Border Grid.Row="1" Margin="24" CornerRadius="8" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Background="White" Padding="32,24">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentDocument}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="380">
+                        <Border Width="48" Height="48" Background="#EEF2FF" CornerRadius="12" HorizontalAlignment="Center" Margin="0,0,0,12">
+                            <TextBlock Text="📄" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0"/>
+                        </Border>
+                        <TextBlock Text="Henüz dosya seçilmedi" FontSize="14" FontWeight="SemiBold" Foreground="#0F2438" HorizontalAlignment="Center" TextAlignment="Center"/>
+                        <TextBlock Text="Bir dosya seçerek PII taramasını başlatın." FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"/>
+                        <TextBlock Text="PDF, DOCX, XLSX, TXT, UDF veya görsel dosyalarından birini seçebilirsiniz. Desteklenmeyen PDF/UDF redaction güvenli şekilde reddedilir." FontSize="10" Foreground="#94A3B8" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                            <Border Background="#F1F5F9" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
+                                <TextBlock Text="TXT" FontSize="10" Foreground="#475569" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#F1F5F9" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
+                                <TextBlock Text="DOCX" FontSize="10" Foreground="#475569" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#F1F5F9" CornerRadius="4" Padding="8,4" Margin="0,0,6,0">
+                                <TextBlock Text="XLSX" FontSize="10" Foreground="#475569" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#F1F5F9" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Görsel" FontSize="10" Foreground="#475569" FontWeight="SemiBold"/>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <ScrollViewer Grid.Row="1" Margin="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <ScrollViewer.Style>
+                        <Style TargetType="ScrollViewer">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentDocument}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ScrollViewer.Style>
                     <Grid>
-                        <Border Background="White" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1" Padding="16" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="16" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
                             <TextBlock Text="{Binding PreviewText}" FontFamily="Consolas" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap"/>
                         </Border>
-                        <Border Background="White" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1" Padding="8" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="8" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="600"/>
                         </Border>
                     </Grid>
                 </ScrollViewer>
 
                 <!-- Status overlay when busy -->
-                <Border Grid.Row="1" Background="#F8FAFC" Opacity="0.85" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" IsHitTestVisible="False">
+                <Border Grid.Row="1" Background="#F8FAFC" Opacity="0.90" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" IsHitTestVisible="False">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
                         <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#334155" Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="400"/>
@@ -369,8 +440,8 @@
                 </Border>
             </Grid>
 
-            <!-- Right: Details -->
-            <Border Grid.Column="2" BorderBrush="#E5E7EB" BorderThickness="1,0,0,0" Background="White">
+            <!-- Right: Detay -->
+            <Border Grid.Column="2" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1,0,0,0" Background="White">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -378,93 +449,145 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
-                        <TextBlock Text="Detay" FontWeight="Bold" FontSize="13"/>
+                    <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1">
+                        <TextBlock Text="Detay" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
                     </Border>
 
                     <ScrollViewer Grid.Row="1" Padding="12" VerticalScrollBarVisibility="Auto">
-                        <StackPanel DataContext="{Binding SelectedDetection}">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
+                        <StackPanel>
+                            <Border Background="#EFF6FF" CornerRadius="6" Padding="8" Margin="0,0,0,12" BorderBrush="#DBEAFE" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="Seçili tespit detayı burada görünür. Soldan bir tespit seçin." FontSize="11" Foreground="#334155" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedDetection}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <StackPanel DataContext="{Binding SelectedDetection}">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <TextBlock Text="{Binding DisplayType}" FontWeight="Bold" FontSize="14" Foreground="#0F2438"/>
+                                        <TextBlock Text="{Binding Value}" FontSize="12" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Border Background="{StaticResource PrimaryGreen}" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="{Binding ConfidenceText}" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding Confidence, StringFormat=' ({0:P0})'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,8,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Sayfa:" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PageNumber}" FontSize="11" Foreground="{StaticResource BodyTextBrush}"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Güven:" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfidenceText}" FontSize="11" Foreground="{StaticResource BodyTextBrush}"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="BBOX:" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Location}" FontSize="10" Foreground="{StaticResource BodyTextBrush}" TextWrapping="Wrap"/>
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Bağlam:" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Context}" FontSize="10" Foreground="#334155" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <CheckBox Content="Maskelenecek" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,12,0,0" FontWeight="SemiBold" ToolTip="Bu tespiti maskeleme için seç/kaldır"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Koordinat sistemi ile bbox gösterimi önizlemede metin olarak işaretlidir. Gerçek redaksiyon ayrı dosyada yapılır, önizleme sadece görseldir." FontSize="9" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
 
-                            <TextBlock Text="Seçili tespit yok" Foreground="#94A3B8" FontSize="11">
+                    <!-- Verification display - distinct success/failure/unsupported -->
+                    <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12" Background="#F8FAFC">
+                        <StackPanel>
+                            <TextBlock Text="Doğrulama" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource BodyTextBrush}"/>
+                            <Border Margin="0,6,0,0" Padding="8" CornerRadius="6">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#F1F5F9"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource BorderBrushLight}"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="True">
+                                                <Setter Property="Background" Value="#F0FDF4"/>
+                                                <Setter Property="BorderBrush" Value="#BBF7D0"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="False">
+                                                <Setter Property="Background" Value="#FEF2F2"/>
+                                                <Setter Property="BorderBrush" Value="#FECACA"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ProcessingState}" Value="Unsupported">
+                                                <Setter Property="Background" Value="#FFFBEB"/>
+                                                <Setter Property="BorderBrush" Value="#FDE68A"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <TextBlock FontSize="12" FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="Henüz doğrulanmadı"/>
+                                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="True">
+                                                        <Setter Property="Text" Value="✓ Güvenli kopya hazır"/>
+                                                        <Setter Property="Foreground" Value="#15803D"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="False">
+                                                        <Setter Property="Text" Value="✗ Güvenli kopya hazır değil"/>
+                                                        <Setter Property="Foreground" Value="#B91C1C"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ProcessingState}" Value="Unsupported">
+                                                        <Setter Property="Text" Value="⊘ Bu format güvenli olarak desteklenmiyor"/>
+                                                        <Setter Property="Foreground" Value="#92400E"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock FontSize="11" Margin="0,4,0,0">
+                                        <Run Text="Kalıntı: "/>
+                                        <Run Text="{Binding VerificationResult.TotalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C" FontWeight="Bold"/>
+                                        <Run Text=" | Kritik: "/>
+                                        <Run Text="{Binding VerificationResult.CriticalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C"/>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding VerificationResult.VerifiedAt, StringFormat='Zaman: {0:HH:mm:ss}', TargetNullValue=''}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Button Content="Çıktıyı Aç" Command="{Binding OpenOutputCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,8,0,0" Padding="8,5" FontSize="11" ToolTip="Oluşan güvenli kopyayı varsayılan uygulama ile aç"/>
+                            <TextBlock Text="{Binding OutputPath}" FontSize="8" Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding OutputPath}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding UnsupportedMessage}" FontSize="10" Foreground="#92400E" TextWrapping="Wrap" Margin="0,4,0,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding DataContext.SelectedDetection, RelativeSource={RelativeSource AncestorType=Window}}" Value="{x:Null}">
+                                            <DataTrigger Binding="{Binding ProcessingState}" Value="Unsupported">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-
-                            <Border Background="#F1F5F9" CornerRadius="6" Padding="10" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding DisplayType}" FontWeight="Bold" FontSize="14" Foreground="#0F2438"/>
-                                    <TextBlock Text="{Binding Value}" FontSize="12" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                        <Border Background="#2F8F4E" CornerRadius="4" Padding="6,2">
-                                            <TextBlock Text="{Binding ConfidenceText}" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Text="{Binding Confidence, StringFormat=' ({0:P0})'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-
-                            <TextBlock Text="Ayrıntılar" FontWeight="SemiBold" FontSize="11" Foreground="#475569" Margin="0,0,0,6"/>
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Sayfa:" FontSize="11" Foreground="#64748B"/>
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PageNumber}" FontSize="11" Foreground="#0F2438"/>
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Güven:" FontSize="11" Foreground="#64748B"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfidenceText}" FontSize="11" Foreground="#0F2438"/>
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Tip:" FontSize="11" Foreground="#64748B"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Type}" FontSize="11" Foreground="#0F2438"/>
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="BBOX:" FontSize="11" Foreground="#64748B"/>
-                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Location}" FontSize="10" Foreground="#0F2438" TextWrapping="Wrap"/>
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Bağlam:" FontSize="11" Foreground="#64748B"/>
-                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Context}" FontSize="10" Foreground="#334155" TextWrapping="Wrap"/>
-                            </Grid>
-
-                            <CheckBox Content="Maskelenecek (IsSelected)" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,12,0,0" FontWeight="SemiBold"/>
-                            <TextBlock Text="CoordinateSystem ile bbox gösterimi merkez önizlemede işaretlidir." FontSize="9" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <!-- Verification display -->
-                    <Border Grid.Row="2" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12" Background="#F8FAFC">
-                        <StackPanel>
-                            <TextBlock Text="Doğrulama" FontWeight="SemiBold" FontSize="12" Foreground="#0F2438"/>
-                            <TextBlock Text="{Binding VerificationResult.Passed, StringFormat='Geçti: {0}', TargetNullValue='Henüz doğrulanmadı'}" FontSize="11" Foreground="#475569" Margin="0,4,0,0"/>
-                            <TextBlock FontSize="11" Margin="0,2,0,0">
-                                <Run Text="Kalıntı: "/>
-                                <Run Text="{Binding VerificationResult.TotalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C" FontWeight="Bold"/>
-                                <Run Text=" | Kritik: "/>
-                                <Run Text="{Binding VerificationResult.CriticalResidualCount, TargetNullValue='-'}" Foreground="#B91C1C"/>
-                            </TextBlock>
-                            <TextBlock Text="{Binding VerificationResult.VerifiedAt, StringFormat='Zaman: {0:HH:mm:ss}', TargetNullValue=''}" FontSize="9" Foreground="#94A3B8" Margin="0,2,0,0"/>
-                            <Button Content="Çıktıyı Aç" Command="{Binding OpenOutputCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,8,0,0" Padding="8,4" FontSize="11"/>
-                            <TextBlock Text="{Binding OutputPath}" FontSize="8" Foreground="#64748B" TextTrimming="CharacterEllipsis" ToolTip="{Binding OutputPath}" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -472,50 +595,58 @@
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <ProgressBar Width="100" Height="6" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <ProgressBar Width="100" Height="5" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="600"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding ProcessingState}" FontSize="10" Foreground="#64748B" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding VerificationResult.Passed, StringFormat='Doğrulama: {0}', TargetNullValue=''}" FontSize="10" Foreground="#2F8F4E" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ProcessingState}" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock FontSize="10" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="True">
+                                        <Setter Property="Foreground" Value="#15803D"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding VerificationResult.Passed}" Value="False">
+                                        <Setter Property="Foreground" Value="#B91C1C"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        <Run Text="Doğrulama: "/>
+                        <Run Text="{Binding VerificationResult.Passed, TargetNullValue='-'}"/>
+                    </TextBlock>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Footer #FAFBFC with 4 groups horizontally centered, 7x7 dots, 26px gap -->
-        <Grid Grid.Row="4" Background="#FAFBFC">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <!-- Group 1 -->
+        <!-- Footer #FAFBFC with 4 groups horizontally centered, 7x7 dots, 26px gap - static decorative -->
+        <Grid Grid.Row="4" Background="{StaticResource FooterBackground}">
+            <Border BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,8">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
-                    <Ellipse Width="7" Height="7" Fill="#2F8F4E" VerticalAlignment="Center"/>
-                    <TextBlock Text="Eksim Enerji" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="7" Height="7" Fill="{StaticResource PrimaryGreen}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Eksim Enerji" FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
-                <!-- Group 2 -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
-                    <Ellipse Width="7" Height="7" Fill="#0F2438" VerticalAlignment="Center"/>
-                    <TextBlock Text="Tamamen Yerel" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="7" Height="7" Fill="{StaticResource DicleOrange}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Dicle Grubu" FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
-                <!-- Group 3 -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,26,0">
-                    <Ellipse Width="7" Height="7" Fill="#33506A" VerticalAlignment="Center"/>
-                    <TextBlock Text="Bulut Yok" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="7" Height="7" Fill="{StaticResource GidaGold}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Gıda Grubu" FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
-                <!-- Group 4 -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Ellipse Width="7" Height="7" Fill="#16354D" VerticalAlignment="Center"/>
-                    <TextBlock Text="Güvenli Maskeleme" FontSize="10" Foreground="#334155" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="7" Height="7" Fill="{StaticResource VenturesPurple}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Eksim Ventures" FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
         </Grid>

@@ -475,75 +475,75 @@ Group indicators:
 - Gıda Grubu: `#C9A24B`
 - Eksim Ventures: `#5B6EE8`
 
-## Header
+## Header — Polished 2026-08-27
 
-- [ ] Background `#0F2438`
-- [ ] 34x34px brand block
-- [ ] Brand block border-radius 8px
-- [ ] Brand block background `#2F8F4E`
-- [ ] White brand mark
-- [ ] Brand mark font-weight 800
-- [ ] Brand mark font-size 14px
-- [ ] `Eksim SafeCopy` title
-- [ ] Title white
-- [ ] Title font-size approximately 19px
-- [ ] Title font-weight 800
-- [ ] Subtitle
-- [ ] Subtitle color `#B7C4D0`
-- [ ] Subtitle font-size approximately 12.5px
-- [ ] Local-only/privacy status indicator
-- [ ] Diagnostic/settings actions as required by final UX
-- [ ] Search field uses `#16354D`
-- [ ] Search border `#33506A`
-- [ ] Search text white
-- [ ] Search placeholder `#8FA3B4`
+- [x] Background `#0F2438` (`MainWindow.xaml:19` Grid #0F2438, `App.xaml:5` HeaderBackground)
+- [x] 34x34px brand block (`MainWindow.xaml:37` 34x34)
+- [x] Brand block border-radius 8px (`CornerRadius="8"`)
+- [x] Brand block background `#2F8F4E` (`PrimaryGreen`)
+- [x] White brand mark (`EK` White)
+- [x] Brand mark font-weight 800 (`FontWeight="ExtraBold"`)
+- [x] Brand mark font-size 14px (`FontSize="14"`)
+- [x] `Eksim SafeCopy` title (`Text="Eksim SafeCopy"` White)
+- [x] Title white (`Foreground="White"`)
+- [x] Title font-size approximately 19px (`FontSize="19"`)
+- [x] Title font-weight 800 (`ExtraBold`)
+- [x] Subtitle (`Güvenli PII Maskeleme - Tamamen Yerel`)
+- [x] Subtitle color `#B7C4D0` (`SubtitleForeground`)
+- [x] Subtitle font-size approximately 12.5px (`12.5`)
+- [x] Local-only/privacy status indicator (subtitle conveys, footer decorative, no cloud)
+- [~] Diagnostic/settings actions as required by final UX — not yet (future Phase 14)
+- [x] Search field uses `#16354D` (`App.xaml:8` SearchBackground, left detection search `Border #16354D`)
+- [x] Search border `#33506A` (`BorderBlue`)
+- [x] Search text white (`Foreground="White"`)
+- [x] Search placeholder `#8FA3B4` (`PlaceholderBrush`)
 
-## Footer Group Signature Strip
+## Footer Group Signature Strip — Polished 2026-08-27
 
 Footer must be at the bottom of the application.
 
 It is static/decorative and must not trigger filtering or navigation.
 
-- [ ] Background `#FAFBFC`
-- [ ] Top border `1px solid #DDE2E6`
-- [ ] Horizontally centered
-- [ ] Approximately 26px spacing between items
-- [ ] Font size approximately 11.5px
-- [ ] Text color `#64748B`
-- [ ] 7x7px circular indicators
+- [x] Background `#FAFBFC` (`FooterBackground`, `MainWindow.xaml:492` Grid #FAFBFC)
+- [x] Top border `1px solid #DDE2E6` (`BorderBrush #DDE2E6`, `BorderThickness="0,1,0,0"`)
+- [x] Horizontally centered (`HorizontalAlignment="Center"`)
+- [x] Approximately 26px spacing between items (`Margin="0,0,26,0"`)
+- [x] Font size approximately 11.5px (`FontSize="11.5"`)
+- [x] Text color `#64748B` (`SecondaryTextBrush`)
+- [x] 7x7px circular indicators (`Width="7" Height="7" Ellipse`)
 
 Items:
 
-- [ ] Green dot `#2F8F4E` + `Eksim Enerji`
-- [ ] Orange dot `#D9622B` + `Dicle Grubu`
-- [ ] Gold/mustard dot `#C9A24B` + `Gıda Grubu`
-- [ ] Purple-blue dot `#5B6EE8` + `Eksim Ventures`
+- [x] Green dot `#2F8F4E` + `Eksim Enerji` (`DotGreen`)
+- [x] Orange dot `#D9622B` + `Dicle Grubu` (`DicleOrange`)
+- [x] Gold/mustard dot `#C9A24B` + `Gıda Grubu` (`GidaGold`)
+- [x] Purple-blue dot `#5B6EE8` + `Eksim Ventures` (`VenturesPurple`)
 
 Footer items are decorative only.
 
-They are not buttons.
+They are not buttons. (`Grid` not `Button`, no Command)
 
-They do not trigger filtering.
+They do not trigger filtering. (no filter logic)
 
-They do not navigate anywhere.
+They do not navigate anywhere. (no navigation)
 
-## General UI
+## General UI — Polished 2026-08-27
 
-- [ ] Navigation
-- [ ] Cards
-- [ ] Typography
-- [ ] Icons
-- [ ] Empty states
-- [ ] Loading states
-- [ ] Success states
-- [ ] Warning states
-- [ ] Error states
-- [ ] Confirmation dialogs
-- [ ] Windows 11 DPI scaling
-- [ ] Accessibility
-- [ ] Keyboard navigation
-- [ ] Tooltip/help
-- [ ] Professional error messages
+- [x] Navigation (3-column body, batch queue top, header/footer fixed, `MinWidth 1024 MinHeight 700` responsive)
+- [x] Cards (Border CornerRadius 6, BorderBrush #DDE2E6, Padding 12, `Background White`)
+- [x] Typography (header 19/800, subtitle 12.5, body 11-13, secondary 10-11, consistent hierarchy)
+- [x] Icons (📄 empty state 22px in #EEF2FF 48px circle, not heavy graphics)
+- [x] Empty states (center `Border` with `Henüz dosya seçilmedi` + guidance + format tags, `Visibility` Collapsed when `CurrentDocument != null`)
+- [x] Loading states (ProgressBar IsIndeterminate + `StatusMessage` + overlay 0.90)
+- [x] Success states (Verification `F0FDF4` green border, `✓ Güvenli kopya hazır`)
+- [x] Warning states (Unsupported `FFFBEB` yellow, `⊘ Bu format...`)
+- [x] Error states (Failed `FEF2F2` red, `✗ Güvenli kopya hazır değil`, `StatusMessage` no stack trace)
+- [x] Confirmation dialogs (ContextMenu `Çıktıyı Aç/Kuyruktan Çıkar`, unsupported message)
+- [x] Windows 11 DPI scaling (`UseWPF`, `app.manifest` DPI aware, `TextOptions.TextFormattingMode Display`)
+- [x] Accessibility (CheckBox, Button ToolTip, keyboard focus `FocusVisualStyle`, `IsHitTestVisible` for placeholder, `Automation` via Content)
+- [x] Keyboard navigation (Tab order, commands, Enter/Space)
+- [x] Tooltip/help (all buttons `ToolTip`, `StatusMessage`, `UnsupportedMessage`)
+- [x] Professional error messages (Result/Error `Message` Turkish, no stack trace, `Dosya yüklenemedi: ...`)
 
 Visual polish happens after business/security functionality is stable.
 

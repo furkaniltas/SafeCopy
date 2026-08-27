@@ -9,6 +9,15 @@
         <SolidColorBrush x:Key="FooterBackground" Color="#FAFBFC"/>
         <SolidColorBrush x:Key="SubtitleForeground" Color="#B7C4D0"/>
         <SolidColorBrush x:Key="DotGreen" Color="#2F8F4E"/>
+        <!-- Phase 13 centralized palette -->
+        <SolidColorBrush x:Key="PageBackground" Color="#FAFBFC"/>
+        <SolidColorBrush x:Key="BorderBrushLight" Color="#DDE2E6"/>
+        <SolidColorBrush x:Key="BodyTextBrush" Color="#1F2937"/>
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#64748B"/>
+        <SolidColorBrush x:Key="PlaceholderBrush" Color="#8FA3B4"/>
+        <SolidColorBrush x:Key="DicleOrange" Color="#D9622B"/>
+        <SolidColorBrush x:Key="GidaGold" Color="#C9A24B"/>
+        <SolidColorBrush x:Key="VenturesPurple" Color="#5B6EE8"/>
 
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#2F8F4E"/>
