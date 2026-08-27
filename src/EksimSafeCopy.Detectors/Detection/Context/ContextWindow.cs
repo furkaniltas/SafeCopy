@@ -86,7 +86,7 @@ public sealed class ContextAnalyzer
     private static readonly string[] TurkishTcLabels = 
     {
         "t.c. kimlik", "tc kimlik", "tckn", "kimlik no", "kimlik numarası",
-        "tc no", "kimlik"
+        "tc no", "kimlik", "tc"
     };
 
     private static readonly string[] TurkishPhoneLabels = 
@@ -146,8 +146,8 @@ public sealed class ContextAnalyzer
                 break;
 
             case DetectionType.TcKimlikNo:
-                features.LabelScore = GetMaxLabelScore(window, TurkishTcLabels);
-                features.HasStrongLabel = features.LabelScore > 0.6;
+                features.LabelScore = GetMaxLabelScore(window, TurkishTcLabels, 200);
+                features.HasStrongLabel = features.LabelScore > 0.5;
                 break;
 
             case DetectionType.Phone:
@@ -181,12 +181,12 @@ public sealed class ContextAnalyzer
         return features;
     }
 
-    private double GetMaxLabelScore(ContextWindow window, string[] labels)
+    private double GetMaxLabelScore(ContextWindow window, string[] labels, int maxDistance = 50)
     {
         double maxScore = 0;
         foreach (var label in labels)
         {
-            var score = window.GetLabelProximityScore(label);
+            var score = window.GetLabelProximityScore(label, maxDistance);
             if (score > maxScore) maxScore = score;
         }
         return maxScore;

@@ -1,3 +1,4 @@
+#pragma warning disable CS8602,CS8604,CS8618,CS8600
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -5,8 +6,12 @@ using System.Security.Cryptography;
 using System.Text;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
+using EksimSafeCopy.DocumentEngine.Ingestion;
 using EksimSafeCopy.DocumentEngine.Security;
 using EksimSafeCopy.Infrastructure;
+using EksimSafeCopy.Detectors;
+using EksimSafeCopy.Renderer;
+using EksimSafeCopy.Ocr;
 using EksimSafeCopy.Renderer.Redaction;
 using DF = EksimSafeCopy.Core.Abstractions.DocumentFormat;
 using FluentAssertions;
@@ -522,5 +527,152 @@ public class XlsxRedactorTests
         using var sha256 = SHA256.Create();
         var hash = sha256.ComputeHash(stream);
         return Convert.ToHexString(hash);
+    }
+
+    [Fact]
+    public async Task Xlsx_RealisticTcCell_EndToEndRedaction()
+    {
+        // Realistic XLSX as described: headers row1, data row2 with C2=60908186000 (synthetic but realistic PII)
+        var tempFile = CreateRealisticXlsx();
+        try
+        {
+            // 1. Ingest via DocumentEngine
+            var services = new ServiceCollection();
+            services.AddSingleton(new DocumentSecurityOptions());
+            services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
+            services.AddSingleton<IFileSystem, FileSystem>();
+            services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Xlsx.XlsxDocumentIngestor>();
+            services.AddSingleton<IDocumentEngine, EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine>();
+            services.AddDetectors();
+            var provider = services.BuildServiceProvider();
+            var engine = provider.GetRequiredService<IDocumentEngine>();
+            var detector = provider.GetRequiredService<IDetectionEngine>();
+
+            var load = engine.Load(tempFile);
+            load.IsSuccess.Should().BeTrue();
+            var doc = load.Value;
+
+            // 4. Detection should target C2's 60908186000 (even though checksum invalid, context "TC" makes it detectable)
+            var det = detector.Detect(doc);
+            det.IsSuccess.Should().BeTrue();
+            det.Value.Should().Contain(d => d.Value == "60908186000", "C2's TC must be detected even with invalid checksum due to header context");
+            var tcDet = det.Value.First(d => d.Value == "60908186000");
+
+            // 5. Redaction
+            var rendererServices = new ServiceCollection();
+            rendererServices.AddSingleton(new DocumentSecurityOptions());
+            rendererServices.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
+            rendererServices.AddSingleton<IFileSystem, FileSystem>();
+            rendererServices.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Xlsx.XlsxDocumentIngestor>();
+            rendererServices.AddSingleton<IDocumentEngine, EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine>();
+            rendererServices.AddDetectors();
+            rendererServices.AddRenderer();
+            var rProvider = rendererServices.BuildServiceProvider();
+            var rEngine = rProvider.GetRequiredService<IDocumentEngine>();
+            var rDetector = rProvider.GetRequiredService<IDetectionEngine>();
+            var planner = rProvider.GetRequiredService<IRedactionPlanner>();
+            var verifier = rProvider.GetRequiredService<IVerificationEngine>();
+            var redactor = rProvider.GetServices<IRedactor>().First(r => r.TargetFormat == DF.Xlsx);
+
+            var rDoc = rEngine.Load(tempFile).Value;
+            var rDetAll = rDetector.Detect(rDoc).Value;
+            // For this realistic test, redact all detected PII to ensure 0 residual (as per SUCCESS invariants)
+            var plan = planner.CreatePlan(rDoc, rDetAll, new RenderOptions()).Value;
+
+            var redactedBytes = redactor.Redact(File.ReadAllBytes(tempFile), plan, new RenderOptions());
+            redactedBytes.IsSuccess.Should().BeTrue();
+
+            // 7-8. Output XLSX
+            var outPath = Path.Combine(Path.GetTempPath(), $"realistic_out_{Guid.NewGuid():N}.xlsx");
+            File.WriteAllBytes(outPath, redactedBytes.Value);
+            try
+            {
+                // 9. C1 must remain "TC"
+                using (var outDoc = SpreadsheetDocument.Open(outPath, false))
+                {
+                    var ws = outDoc.WorkbookPart.WorksheetParts.First().Worksheet;
+                    var sd = ws.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.SheetData>();
+                    var rows = sd.Elements<Row>().ToList();
+                    var row1 = rows[0];
+                    var c1 = row1.Elements<Cell>().First(c => c.CellReference?.Value == "C1");
+                    string c1Val = GetCellValueForTest(c1, outDoc.WorkbookPart.SharedStringTablePart?.SharedStringTable);
+                    c1Val.Should().Be("TC", "C1 header must remain, only C2 should be redacted");
+
+                    var row2 = rows[1];
+                    var c2 = row2.Elements<Cell>().First(c => c.CellReference?.Value == "C2");
+                    string c2Val = c2.GetFirstChild<InlineString>()?.InnerText ?? c2.CellValue?.Text ?? "";
+                    if (c2.DataType != null && c2.DataType.Value == CellValues.SharedString)
+                    {
+                        var sst = outDoc.WorkbookPart.SharedStringTablePart.SharedStringTable;
+                        c2Val = sst.ElementAt(int.Parse(c2.CellValue.Text)).InnerText;
+                    }
+                    c2Val.Should().NotBe("60908186000");
+                    c2Val.Should().Contain("[", "C2 must be placeholder");
+                }
+
+                // 10-11. ZIP/XML must not contain original
+                var zipBytes = File.ReadAllBytes(outPath);
+                var allXml = ExtractAllXmlIfValid(zipBytes);
+                allXml.Should().NotContain("60908186000", "C2 value must not exist anywhere in ZIP/XML");
+
+                // 12-15. Re-ingest output and detect residual
+                var outLoad = rEngine.Load(outPath);
+                outLoad.IsSuccess.Should().BeTrue();
+                var outDet = rDetector.Detect(outLoad.Value);
+                outDet.Value.Should().NotContain(d => d.Value == "60908186000", "residual TC must be 0");
+
+                var verify = verifier.Verify(outPath, DF.Xlsx);
+                verify.IsSuccess.Should().BeTrue();
+                verify.Value.Passed.Should().BeTrue("only when residual truly 0");
+                verify.Value.TotalResidualCount.Should().Be(0);
+                verify.Value.CriticalResidualCount.Should().Be(0);
+            }
+            finally
+            {
+                if (File.Exists(outPath)) File.Delete(outPath);
+            }
+        }
+        finally { File.Delete(tempFile); }
+    }
+
+    private string CreateRealisticXlsx()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"realistic_{Guid.NewGuid():N}.xlsx");
+        using var doc = SpreadsheetDocument.Create(tempFile, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook);
+        var wbPart = doc.AddWorkbookPart();
+        wbPart.Workbook = new Workbook();
+        var wsPart = wbPart.AddNewPart<WorksheetPart>();
+        wsPart.Worksheet = new Worksheet(new SheetData());
+        var sheets = wbPart.Workbook.AppendChild(new Sheets());
+        sheets.Append(new Sheet { Id = wbPart.GetIdOfPart(wsPart), SheetId = 1, Name = "Sheet1" });
+        var sd = wsPart.Worksheet.GetFirstChild<SheetData>();
+        var row1 = new Row { RowIndex = 1 };
+        row1.Append(new Cell { CellReference = "A1", CellValue = new CellValue("TC"), DataType = CellValues.String });
+        row1.Append(new Cell { CellReference = "B1", CellValue = new CellValue("AD Soyad"), DataType = CellValues.String });
+        row1.Append(new Cell { CellReference = "C1", CellValue = new CellValue("TC"), DataType = CellValues.String });
+        row1.Append(new Cell { CellReference = "D1", CellValue = new CellValue("Telefon"), DataType = CellValues.String });
+        row1.Append(new Cell { CellReference = "E1", CellValue = new CellValue("Adres"), DataType = CellValues.String });
+        sd.Append(row1);
+        var row2 = new Row { RowIndex = 2 };
+        row2.Append(new Cell { CellReference = "A2", CellValue = new CellValue("12222222"), DataType = CellValues.String });
+        row2.Append(new Cell { CellReference = "B2", CellValue = new CellValue("Mehmet Yılmaz"), DataType = CellValues.String });
+        row2.Append(new Cell { CellReference = "C2", CellValue = new CellValue("60908186000"), DataType = CellValues.String });
+        row2.Append(new Cell { CellReference = "D2", CellValue = new CellValue("05321234567"), DataType = CellValues.String });
+        row2.Append(new Cell { CellReference = "E2", CellValue = new CellValue("Ankara Çankaya"), DataType = CellValues.String });
+        sd.Append(row2);
+        wbPart.Workbook.Save();
+        return tempFile;
+    }
+
+    private string GetCellValueForTest(Cell cell, SharedStringTable? sst)
+    {
+        if (cell.DataType != null && cell.DataType.Value == CellValues.SharedString)
+        {
+            if (int.TryParse(cell.CellValue?.Text, out int idx) && sst != null)
+                return sst.ElementAt(idx).InnerText;
+        }
+        var inline = cell.GetFirstChild<InlineString>();
+        if (inline != null) return inline.InnerText;
+        return cell.CellValue?.Text ?? "";
     }
 }

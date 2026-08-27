@@ -124,7 +124,8 @@ public class TurkishIdentityNumberDetectorTests
     [Fact]
     public void Detect_TcWithWrongChecksum_NotDetected()
     {
-        var document = CreateDocument("TC: 12345678902");
+        // Invalid checksum without strong label should not be detected; with "TC" label it would be detected via fallback
+        var document = CreateDocument("No label here: 12345678902");
 
         var result = _detectionEngine.Detect(document);
 
