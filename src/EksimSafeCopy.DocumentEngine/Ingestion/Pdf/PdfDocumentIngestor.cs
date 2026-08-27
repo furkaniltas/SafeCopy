@@ -9,8 +9,9 @@ public sealed class PdfDocumentIngestor : DocumentIngestorBase
 {
     public override DocumentFormat SupportedFormat => DocumentFormat.Pdf;
     public override string[] SupportedExtensions => new[] { ".pdf" };
-    public PdfDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem)
-        : base(securityValidator, fileSystem) { }
+    private readonly IOcrEngine? _ocrEngine;
+    public PdfDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem, IOcrEngine? ocrEngine = null)
+        : base(securityValidator, fileSystem) { _ocrEngine = ocrEngine; }
     protected override Result<Document> IngestInternal(string filePath, IngestionOptions options, CancellationToken cancellationToken)
     {
         try
@@ -65,13 +66,59 @@ public sealed class PdfDocumentIngestor : DocumentIngestorBase
     }
     private DocumentPage ProcessPdfPage(Page pdfPage)
     {
-        var textBlocks = new List<TextBlock>();
         var pageText = pdfPage.Text;
         // Extract words with positions
         var words = pdfPage.GetWords().ToList();
         var pageWidth = pdfPage.Width;
         var pageHeight = pdfPage.Height;
         var textBlocksFromWords = CreateTextBlocksFromWords(words, pageWidth, pageHeight);
+        var isScanned = words.Count == 0 && pdfPage.GetImages().Any(); // Heuristic: no text but has images
+        var images = ExtractImages(pdfPage).ToList();
+
+        string finalText = pageText;
+        var finalBlocks = textBlocksFromWords;
+        OcrInfo? ocrInfo = null;
+
+        // OCR integration: when scanned, call OCR on embedded images
+        if (isScanned && _ocrEngine != null && _ocrEngine.IsAvailable && images.Count > 0)
+        {
+            try
+            {
+                var ocrTextParts = new List<string>();
+                var ocrBlocks = new List<TextBlock>();
+                double accumulatedY = 0;
+                foreach (var imgRef in images)
+                {
+                    if (imgRef.Data == null || imgRef.Data.Length == 0) continue;
+                    // Use OCR with Turkish priority, 30s timeout via internal engine
+                    var ocrResult = _ocrEngine.Recognize(imgRef.Data, "tr");
+                    if (ocrResult.IsSuccess && !string.IsNullOrWhiteSpace(ocrResult.Value.Text))
+                    {
+                        ocrTextParts.Add(ocrResult.Value.Text);
+                        var mapped = MapOcrResultToTextBlocks(ocrResult.Value, pdfPage.Number, pageWidth, pageHeight, ref accumulatedY);
+                        ocrBlocks.AddRange(mapped);
+                        ocrInfo = new OcrInfo
+                        {
+                            Engine = _ocrEngine.EngineName,
+                            Language = ocrResult.Value.Language,
+                            AverageConfidence = ocrResult.Value.Confidence,
+                            ProcessedAt = ocrResult.Value.ProcessedAt,
+                            Duration = ocrResult.Value.Duration
+                        };
+                    }
+                }
+                if (ocrBlocks.Count > 0)
+                {
+                    finalText = string.Join("\n", ocrTextParts);
+                    finalBlocks = ocrBlocks;
+                }
+            }
+            catch
+            {
+                // OCR failure fallback: keep original (empty) text, do not crash
+            }
+        }
+
         var page = new DocumentPage
         {
             PageNumber = pdfPage.Number,
@@ -79,12 +126,87 @@ public sealed class PdfDocumentIngestor : DocumentIngestorBase
             Height = Math.Max(0, (int)pdfPage.Height),
             DpiX = 72, // PDF default
             DpiY = 72,
-            Text = pageText,
-            TextBlocks = textBlocksFromWords,
-            IsScanned = words.Count == 0 && pdfPage.GetImages().Any(), // Heuristic: no text but has images
-            Images = ExtractImages(pdfPage).ToList()
+            Text = finalText,
+            TextBlocks = finalBlocks,
+            IsScanned = isScanned,
+            Images = images,
+            OcrInfo = ocrInfo,
+            CoordinateSystem = new CoordinateSystem(Math.Max(1, (int)pageWidth), Math.Max(1, (int)pageHeight), CoordinateOrigin.TopLeft, CoordinateUnit.Points)
         };
         return page;
+    }
+
+    private static IReadOnlyList<TextBlock> MapOcrResultToTextBlocks(OcrResult ocrResult, int pageNumber, double pageWidth, double pageHeight, ref double accumulatedY)
+    {
+        var blocks = new List<TextBlock>();
+        double safeW = Math.Max(1, pageWidth);
+        double safeH = Math.Max(1, pageHeight);
+        // Prefer Lines if available, else Words
+        if (ocrResult.Lines.Count > 0)
+        {
+            int order = 0;
+            foreach (var line in ocrResult.Lines)
+            {
+                var bb = line.BoundingBox.IsEmpty ? new BoundingBox(0, accumulatedY, safeW, 20, safeW, safeH) : line.BoundingBox;
+                // Clamp to page bounds
+                var clamped = new BoundingBox(Math.Max(0, bb.X), Math.Max(0, bb.Y), Math.Min(bb.Width, safeW), Math.Min(bb.Height, safeH), safeW, safeH);
+                var block = new TextBlock
+                {
+                    Text = line.Text,
+                    BoundingBox = clamped,
+                    PageNumber = pageNumber,
+                    OrderIndex = order++,
+                    Type = TextBlockType.Paragraph,
+                    Direction = TextDirection.LeftToRight,
+                    Properties = new Dictionary<string, object> { ["DetectionSource"] = "Ocr", ["Confidence"] = line.Confidence },
+                    Spans = line.Words.Select((w, idx) => new TextSpan
+                    {
+                        StartIndex = idx == 0 ? 0 : line.Words.Take(idx).Sum(x => x.Text.Length + 1),
+                        Length = w.Text.Length,
+                        Text = w.Text,
+                        BoundingBox = w.BoundingBox,
+                        Properties = new Dictionary<string, object> { ["Confidence"] = w.Confidence }
+                    }).ToList().AsReadOnly()
+                };
+                blocks.Add(block);
+                accumulatedY += bb.Height + 5;
+            }
+            return blocks;
+        }
+        if (ocrResult.Words.Count > 0)
+        {
+            var text = ocrResult.Text;
+            var bb = new BoundingBox(0, accumulatedY, safeW, 20, safeW, safeH);
+            var block = new TextBlock
+            {
+                Text = text,
+                BoundingBox = bb,
+                PageNumber = pageNumber,
+                OrderIndex = 0,
+                Type = TextBlockType.Paragraph,
+                Direction = TextDirection.LeftToRight,
+                Properties = new Dictionary<string, object> { ["DetectionSource"] = "Ocr", ["Confidence"] = ocrResult.Confidence }
+            };
+            blocks.Add(block);
+            return blocks;
+        }
+        // Fallback: single block from Text
+        if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+        {
+            var bb = new BoundingBox(0, accumulatedY, safeW, 20, safeW, safeH);
+            blocks.Add(new TextBlock
+            {
+                Text = ocrResult.Text,
+                BoundingBox = bb,
+                PageNumber = pageNumber,
+                OrderIndex = 0,
+                Type = TextBlockType.Paragraph,
+                Direction = TextDirection.LeftToRight,
+                Properties = new Dictionary<string, object> { ["DetectionSource"] = "Ocr", ["Confidence"] = ocrResult.Confidence }
+            });
+            accumulatedY += 25;
+        }
+        return blocks;
     }
     private IReadOnlyList<TextBlock> CreateTextBlocksFromWords(IReadOnlyList<Word> words, double pageWidth, double pageHeight)
     {

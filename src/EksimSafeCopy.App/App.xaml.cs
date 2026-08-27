@@ -3,6 +3,7 @@ using EksimSafeCopy.App.Extensions;
 using EksimSafeCopy.App.Services;
 using EksimSafeCopy.App.ViewModels;
 using EksimSafeCopy.Detectors;
+using EksimSafeCopy.Ocr;
 using EksimSafeCopy.Renderer;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,7 @@ public partial class App : Application
         var services = new ServiceCollection();
 
         services.AddInfrastructure();
+        services.AddOcr();
         services.AddDocumentEngine();
         services.AddDetectors();
         services.AddRenderer();

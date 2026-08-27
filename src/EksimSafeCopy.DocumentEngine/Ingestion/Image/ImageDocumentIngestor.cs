@@ -10,8 +10,9 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
 {
     public override DocumentFormat SupportedFormat => DocumentFormat.Png; // Base format, actual detected per file
     public override string[] SupportedExtensions => new[] { ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp" };
-    public ImageDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem)
-        : base(securityValidator, fileSystem) { }
+    private readonly IOcrEngine? _ocrEngine;
+    public ImageDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem, IOcrEngine? ocrEngine = null)
+        : base(securityValidator, fileSystem) { _ocrEngine = ocrEngine; }
     protected override Result<Document> IngestInternal(string filePath, IngestionOptions options, CancellationToken cancellationToken)
     {
         try
@@ -19,6 +20,8 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
             // Detect actual image format from file signature
             var detectedFormat = DetectImageFormat(filePath);
             using var image = Image.Load<Rgba32>(filePath);
+            var imageBytes = ReadImageBytes(filePath);
+            var (ocrText, ocrBlocks, ocrInfo) = TryOcr(imageBytes, image.Width, image.Height, 1, cancellationToken);
             var page = new DocumentPage
             {
                 PageNumber = 1,
@@ -26,9 +29,11 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
                 Height = image.Height,
                 DpiX = image.Metadata.HorizontalResolution > 0 ? image.Metadata.HorizontalResolution : 96,
                 DpiY = image.Metadata.VerticalResolution > 0 ? image.Metadata.VerticalResolution : 96,
-                Text = string.Empty,
-                TextBlocks = Array.Empty<TextBlock>(),
+                Text = ocrText ?? string.Empty,
+                TextBlocks = ocrBlocks ?? Array.Empty<TextBlock>(),
                 IsScanned = true,
+                OcrInfo = ocrInfo,
+                CoordinateSystem = new CoordinateSystem(image.Width, image.Height, CoordinateOrigin.TopLeft, CoordinateUnit.Pixels),
                 Images = new List<ImageReference>
                 {
                     new ImageReference
@@ -36,7 +41,7 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
                         Format = Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
                         Width = image.Width,
                         Height = image.Height,
-                        Data = ReadImageBytes(filePath),
+                        Data = imageBytes,
                         BoundingBox = new BoundingBox(0, 0, image.Width, image.Height, image.Width, image.Height)
                     }
                 }
@@ -202,7 +207,9 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
     {
         try
         {
-            using var image = Image.Load<Rgba32>(stream);
+            var streamBytes = ReadStreamBytes(stream);
+            using var image = Image.Load<Rgba32>(streamBytes);
+            var (ocrText, ocrBlocks, ocrInfo) = TryOcr(streamBytes, image.Width, image.Height, 1, cancellationToken);
             var page = new DocumentPage
             {
                 PageNumber = 1,
@@ -210,9 +217,11 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
                 Height = image.Height,
                 DpiX = image.Metadata.HorizontalResolution > 0 ? image.Metadata.HorizontalResolution : 96,
                 DpiY = image.Metadata.VerticalResolution > 0 ? image.Metadata.VerticalResolution : 96,
-                Text = string.Empty,
-                TextBlocks = Array.Empty<TextBlock>(),
+                Text = ocrText ?? string.Empty,
+                TextBlocks = ocrBlocks ?? Array.Empty<TextBlock>(),
                 IsScanned = true,
+                OcrInfo = ocrInfo,
+                CoordinateSystem = new CoordinateSystem(image.Width, image.Height, CoordinateOrigin.TopLeft, CoordinateUnit.Pixels),
                 Images = new List<ImageReference>
                 {
                     new ImageReference
@@ -220,7 +229,7 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
                         Format = "unknown",
                         Width = image.Width,
                         Height = image.Height,
-                        Data = ReadStreamBytes(stream),
+                        Data = streamBytes,
                         BoundingBox = new BoundingBox(0, 0, image.Width, image.Height, image.Width, image.Height)
                     }
                 }
@@ -241,5 +250,69 @@ public sealed class ImageDocumentIngestor : DocumentIngestorBase
         {
             return Result<Document>.Failure(Error.Internal($"Image ingestion failed: {ex.Message}", ex));
         }
+    }
+
+    private (string? Text, IReadOnlyList<TextBlock>? Blocks, OcrInfo? Info) TryOcr(byte[] data, int width, int height, int pageNumber, CancellationToken ct)
+    {
+        if (_ocrEngine == null || !_ocrEngine.IsAvailable) return (null, null, null);
+        try
+        {
+            var result = _ocrEngine.Recognize(data, "tr", ct);
+            if (result.IsFailure) return (null, null, null);
+            var ocr = result.Value;
+            if (string.IsNullOrWhiteSpace(ocr.Text)) return (ocr.Text, Array.Empty<TextBlock>(), null);
+            var blocks = MapOcrToBlocks(ocr, pageNumber, width, height);
+            var info = new OcrInfo { Engine = _ocrEngine.EngineName, Language = ocr.Language, AverageConfidence = ocr.Confidence, ProcessedAt = ocr.ProcessedAt, Duration = ocr.Duration };
+            return (ocr.Text, blocks, info);
+        }
+        catch { return (null, null, null); }
+    }
+
+    private static IReadOnlyList<TextBlock> MapOcrToBlocks(OcrResult ocrResult, int pageNumber, int width, int height)
+    {
+        double safeW = Math.Max(1, width);
+        double safeH = Math.Max(1, height);
+        var blocks = new List<TextBlock>();
+        if (ocrResult.Lines.Count > 0)
+        {
+            int order = 0;
+            foreach (var line in ocrResult.Lines)
+            {
+                var bb = line.BoundingBox.IsEmpty ? new BoundingBox(0, order * 22, safeW, 20, safeW, safeH) : line.BoundingBox;
+                blocks.Add(new TextBlock
+                {
+                    Text = line.Text,
+                    BoundingBox = bb,
+                    PageNumber = pageNumber,
+                    OrderIndex = order++,
+                    Type = TextBlockType.Paragraph,
+                    Direction = TextDirection.LeftToRight,
+                    Properties = new Dictionary<string, object> { ["DetectionSource"] = "Ocr", ["Confidence"] = line.Confidence },
+                    Spans = line.Words.Select((w, idx) => new TextSpan
+                    {
+                        StartIndex = idx == 0 ? 0 : line.Words.Take(idx).Sum(x => x.Text.Length + 1),
+                        Length = w.Text.Length,
+                        Text = w.Text,
+                        BoundingBox = w.BoundingBox,
+                        Properties = new Dictionary<string, object> { ["Confidence"] = w.Confidence }
+                    }).ToList().AsReadOnly()
+                });
+            }
+            return blocks;
+        }
+        if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+        {
+            blocks.Add(new TextBlock
+            {
+                Text = ocrResult.Text,
+                BoundingBox = new BoundingBox(0, 0, safeW, 20, safeW, safeH),
+                PageNumber = pageNumber,
+                OrderIndex = 0,
+                Type = TextBlockType.Paragraph,
+                Direction = TextDirection.LeftToRight,
+                Properties = new Dictionary<string, object> { ["DetectionSource"] = "Ocr", ["Confidence"] = ocrResult.Confidence }
+            });
+        }
+        return blocks;
     }
 }

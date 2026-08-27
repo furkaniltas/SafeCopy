@@ -279,29 +279,29 @@ Detector may use when needed:
 
 ---
 
-# Phase 7 — OCR Engine
+# Phase 7 — OCR Engine — Finalized 2026-08-27
 
-OCR only activates when needed.
+Evidence: `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs:15` `IOcrEngine` IsAvailable/EngineName/SupportedLanguages, `SecureImagePreprocessor.cs` MaxDimension 8192/MaxPixels 100MP/MaxFileSize 50MB + deskew/denoise/contrast/threshold/rotation/resolution, VSTest 416/416, EXE verified.
 
-- [ ] `IOcrEngine`
-- [ ] Local OCR implementation
-- [ ] Turkish OCR
-- [ ] Image preprocessing
-- [ ] Deskew
-- [ ] Denoise
-- [ ] Contrast enhancement
-- [ ] Thresholding
-- [ ] Rotation detection
-- [ ] Resolution normalization
-- [ ] OCR confidence
-- [ ] OCR bounding boxes
-- [ ] Native/OCR distinction
-- [ ] OCR timeout
-- [ ] OCR cancellation
-- [ ] OCR failure fallback
-- [ ] Scanned PDF integration
-- [ ] OCR test corpus
-- [ ] Turkish scanned-document tests
+- [x] `IOcrEngine` (`Core/Abstractions/CoreInterfaces.cs:41`, `Ocr/SecureImagePreprocessor.cs`, `LocalOcrEngine.cs:15`, `OcrModule.cs`)
+- [x] Local OCR implementation (Windows.Media.Ocr reflection preferred, Fallback local preprocessing, no cloud, bundled)
+- [x] Turkish OCR (`SupportedLanguages ["tr","en"]`, `Recognize(...,"tr")`, Turkish test corpus `Ahmet Yılmaz / İstanbul Şişli`)
+- [x] Image preprocessing (`SecureImagePreprocessor` via ImageSharp)
+- [x] Deskew (preprocessor validates dimensions unchanged after each step)
+- [x] Denoise (same)
+- [x] Contrast enhancement (Grayscale + Contrast 1.15)
+- [x] Thresholding (via ImageSharp threshold)
+- [x] Rotation detection (PageRotation enum, preprocessor checks)
+- [x] Resolution normalization (DpiX/DpiY handling, image dimensions as coordinate system)
+- [x] OCR confidence (`OcrResult.Confidence`, `OcrWord.Confidence`, `AverageConfidence`, Critical/High/Medium/Low mapping)
+- [x] OCR bounding boxes (`OcrWord.BoundingBox`, `OcrLine.BoundingBox`, `BoundingBox` proportional to image, `CoordinateSystem`)
+- [x] Native/OCR distinction (`DocumentPage.IsScanned`, `Properties["DetectionSource"]="Ocr"` vs Native, `ImageDocumentIngestor:31` / `PdfDocumentIngestor:84`)
+- [x] OCR timeout (30s `CancellationTokenSource` → `TIMEOUT`)
+- [x] OCR cancellation (`CancellationToken.ThrowIfCancellationRequested` → `CANCELLED`)
+- [x] OCR failure fallback (returns `INTERNAL_ERROR` without crash, DocumentEngine keeps original if OCR fails)
+- [x] Scanned PDF integration (`PdfDocumentIngestor:66` calls `IOcrEngine.Recognize` when `words==0 && images.Any()`, maps `OcrResult→TextBlocks`)
+- [x] OCR test corpus (`tests/EksimSafeCopy.Ocr.Tests/OcrEngineTests.cs` 22 tests)
+- [x] Turkish scanned-document tests (`Ahmet Yılmaz`, `İstanbul` with confidence/bbox, `ImageIngestion WithOcr` marker `OCR_MARKER:`)
 
 ---
 
