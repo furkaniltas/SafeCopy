@@ -39,7 +39,9 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "departman", "üniversite", "okul", "hastane", "belediye", "valilik",
         "kaymakamlık", "mahkeme", "polis", "elektrik", "su", "doğalgaz",
         "internet", "telekom", "dağıtım", "tedarik", "hizmet", "destek",
-        "anonym", "anonim", "misafir", "müşteri", "müşteriler", "üye", "üyeler"
+        "anonym", "anonim", "misafir", "müşteri", "müşteriler", "üye", "üyeler",
+        "tesisat", "numarası", "numarasi", "sayaç", "sayac", "abone", "tesisat",
+        "ad", "soyad", "telefon", "adres", "tc", "numara"
     };
 
     private static readonly HashSet<string> TurkishTitles = new(StringComparer.OrdinalIgnoreCase)

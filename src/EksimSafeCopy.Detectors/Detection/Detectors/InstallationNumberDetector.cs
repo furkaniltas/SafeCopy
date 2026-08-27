@@ -80,6 +80,47 @@ private static readonly Regex InstallationPattern = new(
             detections.Add(detection);
         }
 
+        // Fallback for XLSX where header and data are in separate TextBlocks (e.g., A1: Tesisat Numarası and A2: 12222222)
+        // Check each TextBlock that looks like a header, and find data blocks in the same column
+        var headerBlocks = page.TextBlocks.Where(b => b.Text.Contains("Tesisat", StringComparison.OrdinalIgnoreCase) || b.Text.Contains("Abone", StringComparison.OrdinalIgnoreCase) || b.Text.Contains("Sayaç", StringComparison.OrdinalIgnoreCase) || b.Text.Contains("Sayac", StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var header in headerBlocks)
+        {
+            if (!header.Properties.TryGetValue("CellReference", out var headerRefObj) || headerRefObj is not string headerRef) continue;
+            var headerCol = new string(headerRef.Where(char.IsLetter).ToArray());
+            if (string.IsNullOrEmpty(headerCol)) continue;
+
+            // Find data blocks in the same column (e.g., A2 for header A1)
+            var columnDataBlocks = page.TextBlocks.Where(b =>
+                b.Properties.TryGetValue("CellReference", out var refObj) && refObj is string r && r.StartsWith(headerCol, StringComparison.OrdinalIgnoreCase) && r != headerRef
+                && !string.IsNullOrWhiteSpace(b.Text) && b.Text.Contains(":")
+            ).ToList();
+
+            foreach (var dataBlock in columnDataBlocks)
+            {
+                // Extract value part after ": "
+                var colonIdx = dataBlock.Text.IndexOf(": ");
+                var value = colonIdx >= 0 ? dataBlock.Text.Substring(colonIdx + 2).Trim() : dataBlock.Text.Trim();
+                if (string.IsNullOrWhiteSpace(value) || value.Length < 6) continue;
+                // Check if value is alphanumeric 6-20 and not already detected
+                if (!Regex.IsMatch(value, @"^[A-Z0-9]{6,20}$", RegexOptions.IgnoreCase)) continue;
+                if (detections.Any(d => d.Value == value)) continue;
+
+                // Find the span for this value within the block
+                var valueSpan = dataBlock.Spans.FirstOrDefault(s => s.Text == value);
+                if (valueSpan == null) continue;
+
+                var detection = CreateDetection(
+                    value: value,
+                    confidence: 0.75,
+                    pageNumber: page.PageNumber,
+                    textSpan: valueSpan,
+                    context: header.Text + " " + dataBlock.Text,
+                    properties: new Dictionary<string, object> { ["header_cell"] = headerRef, ["data_cell"] = dataBlock.Properties["CellReference"] });
+
+                detections.Add(detection);
+            }
+        }
+
         return detections;
     }
 
