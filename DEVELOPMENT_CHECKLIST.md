@@ -426,21 +426,21 @@ Evidence: `docs/security/LOCAL_ONLY_AUDIT.md` + `src/EksimSafeCopy.Infrastructur
 
 ---
 
-# Phase 12 — Batch Processing
+# Phase 12 — Batch Processing — Finalized 2026-08-27
 
-Enterprise legal usage requires multiple documents processing.
+Evidence: `src/EksimSafeCopy.Core/Abstractions/BatchAbstractions.cs` + `Infrastructure/Batch/BatchProcessor.cs` + `App/ViewModels/BatchItemViewModel.cs`/`MainViewModel` batch commands + `App.Tests/BatchProcessorTests.cs` 16 tests, VSTest 448/448, EXE batch queue verified.
 
-- [ ] Multiple file selection
-- [ ] Multiple drag & drop
-- [ ] Processing queue
-- [ ] Operation status
-- [ ] Success/failed separation
-- [ ] Per-file detection summary
-- [ ] Per-file verification
-- [ ] Cancel
-- [ ] Retry
-- [ ] Failed item isolation
-- [ ] Original files preservation
+- [x] Multiple file selection (`IFileDialogService.OpenFiles` Multiselect, `MainViewModel.AddFilesToBatchCommand`, `BatchProcessorTests.Batch_MultipleFormats`)
+- [x] Multiple drag & drop (`MainWindow.xaml.cs` AllowDrop + `DragEnter/Drop` → `AddFilesToBatch`, `Batch_SameBatchFilesDoNotAffectEachOther`)
+- [x] Processing queue (`BatchRequest`, `BatchResult.Items`, `BatchItem.State Queued→Processing→Success/Failed/Unsupported/Cancelled`, `BatchItemViewModel`, `Batch_TotalCount` verified)
+- [x] Operation status (`BatchItem.StatusMessage`, `BatchResult.Success/Failed/Unsupported/Cancelled counts`, `Batch_StatusMessage` tests)
+- [x] Success/failed separation (`BatchResult.SuccessCount/FailedCount/UnsupportedCount`, `MainWindow` ListView grouping, `Batch_SuccessAndFailed_Mixed`)
+- [x] Per-file detection summary (`BatchItem.Detections`, `DetectionSummary`, `Batch_MultipleFormats` per-file)
+- [x] Per-file verification (`BatchItem.VerificationResult`, `Output/Hash`, `Batch_VerificationFailure_NotPresentedAsSuccess`, end-to-end TXT/DOCX pipeline)
+- [x] Cancel (`CancellationToken` + `SemaphoreSlim`, `IsBatchProcessing`, `CancelBatchCommand`, `Batch_Cancellation_CancelsRemaining`, temp cleanup)
+- [x] Retry (`RetryFailedCommand` isolates Failed items, `Failed item isolation` → `Batch_SuccessAndFailed_Mixed` retry)
+- [x] Failed item isolation (per-file try/catch, `ContinueOnError`, `distinct` failure does not block others, `Batch_SameBatchFilesDoNotAffectEachOther`)
+- [x] Original files preservation (SHA256 `IFileSystem.ComputeHash` before/after, `OutputPath != InputPath` `_SafeCopy` suffix, `Batch_OriginalHashUnchanged` + `OutputIsolation`)
 
 ---
 

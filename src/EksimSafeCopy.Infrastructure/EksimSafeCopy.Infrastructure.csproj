@@ -12,5 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EksimSafeCopy.Core\EksimSafeCopy.Core.csproj" />
+    <ProjectReference Include="..\EksimSafeCopy.DocumentEngine\EksimSafeCopy.DocumentEngine.csproj" />
   </ItemGroup>
 </Project>

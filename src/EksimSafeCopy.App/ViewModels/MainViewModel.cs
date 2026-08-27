@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -36,6 +37,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IDocumentSecurityValidator _securityValidator;
     private readonly IFileSystem _fileSystem;
     private readonly IFileDialogService _fileDialogService;
+    private readonly IBatchProcessor? _batchProcessor;
 
     private string? _selectedFilePath;
     private Document? _currentDocument;
@@ -52,6 +54,12 @@ public sealed class MainViewModel : ViewModelBase
     private CancellationTokenSource? _cts;
     private string? _unsupportedMessage;
 
+    // Batch fields
+    private bool _isBatchProcessing;
+    private string _batchStatusMessage = "Toplu işlem hazır.";
+    private BatchResult? _lastBatchResult;
+    private CancellationTokenSource? _batchCts;
+
     public MainViewModel(
         IDocumentEngine documentEngine,
         IDetectionEngine detectionEngine,
@@ -60,7 +68,8 @@ public sealed class MainViewModel : ViewModelBase
         IVerificationEngine verificationEngine,
         IDocumentSecurityValidator securityValidator,
         IFileSystem fileSystem,
-        IFileDialogService fileDialogService)
+        IFileDialogService fileDialogService,
+        IBatchProcessor? batchProcessor = null)
     {
         _documentEngine = documentEngine ?? throw new ArgumentNullException(nameof(documentEngine));
         _detectionEngine = detectionEngine ?? throw new ArgumentNullException(nameof(detectionEngine));
@@ -70,8 +79,11 @@ public sealed class MainViewModel : ViewModelBase
         _securityValidator = securityValidator ?? throw new ArgumentNullException(nameof(securityValidator));
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+        _batchProcessor = batchProcessor;
 
         Detections = new ObservableCollection<DetectionItemViewModel>();
+        BatchItems = new ObservableCollection<BatchItemViewModel>();
+        BatchItems.CollectionChanged += OnBatchCollectionChanged;
 
         OpenFileCommand = new AsyncRelayCommand(_ => OpenFileAsync());
         DetectCommand = new AsyncRelayCommand(_ => DetectAsync(), _ => CanDetect);
@@ -79,9 +91,64 @@ public sealed class MainViewModel : ViewModelBase
         CancelCommand = new RelayCommand(_ => Cancel(), _ => IsBusy);
         NewScanCommand = new RelayCommand(_ => NewScan());
         OpenOutputCommand = new RelayCommand(_ => OpenOutput(), _ => !string.IsNullOrEmpty(OutputPath) && File.Exists(OutputPath));
+
+        // Batch commands
+        AddFilesToBatchCommand = new RelayCommand(_ => AddFilesToBatchViaDialog());
+        // DragDrop uses AddFilesToBatch(IEnumerable<string>)
+        StartBatchCommand = new AsyncRelayCommand(_ => StartBatchAsync(), _ => CanStartBatch);
+        CancelBatchCommand = new RelayCommand(_ => CancelBatch(), _ => IsBatchProcessing);
+        RetryFailedCommand = new AsyncRelayCommand(_ => RetryFailedAsync(), _ => CanRetryFailed);
+        ClearBatchCommand = new RelayCommand(_ => ClearBatch(), _ => BatchItems.Count > 0 && !IsBatchProcessing);
+        RemoveFromBatchCommand = new RelayCommand(param => { if (param is BatchItemViewModel vm) RemoveFromBatch(vm); }, _ => !IsBatchProcessing);
+        OpenBatchOutputCommand = new RelayCommand(param => { if (param is BatchItemViewModel vm) OpenBatchOutput(vm); });
     }
 
     public ObservableCollection<DetectionItemViewModel> Detections { get; }
+    public ObservableCollection<BatchItemViewModel> BatchItems { get; }
+
+    public BatchResult? LastBatchResult
+    {
+        get => _lastBatchResult;
+        set
+        {
+            if (SetProperty(ref _lastBatchResult, value))
+            {
+                OnPropertyChanged(nameof(BatchSuccessCount));
+                OnPropertyChanged(nameof(BatchFailedCount));
+                OnPropertyChanged(nameof(BatchUnsupportedCount));
+                OnPropertyChanged(nameof(BatchCancelledCount));
+                OnPropertyChanged(nameof(BatchTotalCount));
+            }
+        }
+    }
+
+    public bool IsBatchProcessing
+    {
+        get => _isBatchProcessing;
+        set
+        {
+            if (SetProperty(ref _isBatchProcessing, value))
+            {
+                OnPropertyChanged(nameof(CanStartBatch));
+                OnPropertyChanged(nameof(CanRetryFailed));
+            }
+        }
+    }
+
+    public string BatchStatusMessage
+    {
+        get => _batchStatusMessage;
+        set => SetProperty(ref _batchStatusMessage, value);
+    }
+
+    public int BatchSuccessCount => LastBatchResult?.SuccessCount ?? BatchItems.Count(x => x.State == BatchItemState.Success);
+    public int BatchFailedCount => LastBatchResult?.FailedCount ?? BatchItems.Count(x => x.State == BatchItemState.Failed);
+    public int BatchUnsupportedCount => LastBatchResult?.UnsupportedCount ?? BatchItems.Count(x => x.State == BatchItemState.Unsupported);
+    public int BatchCancelledCount => LastBatchResult?.CancelledCount ?? BatchItems.Count(x => x.State == BatchItemState.Cancelled);
+    public int BatchTotalCount => BatchItems.Count;
+
+    public bool CanStartBatch => !IsBatchProcessing && !IsBusy && BatchItems.Any(x => x.State == BatchItemState.Queued || x.State == BatchItemState.Failed || x.State == BatchItemState.Cancelled || x.State == BatchItemState.Skipped);
+    public bool CanRetryFailed => !IsBatchProcessing && !IsBusy && BatchItems.Any(x => x.State == BatchItemState.Failed);
 
     public string? SelectedFilePath
     {
@@ -176,6 +243,7 @@ public sealed class MainViewModel : ViewModelBase
             if (SetProperty(ref _isBusy, value))
             {
                 OnPropertyChanged(nameof(CanRedact));
+                OnPropertyChanged(nameof(CanStartBatch));
             }
         }
     }
@@ -204,6 +272,296 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand CancelCommand { get; }
     public ICommand NewScanCommand { get; }
     public ICommand OpenOutputCommand { get; }
+
+    // Batch commands
+    public ICommand AddFilesToBatchCommand { get; }
+    public ICommand StartBatchCommand { get; }
+    public ICommand CancelBatchCommand { get; }
+    public ICommand RetryFailedCommand { get; }
+    public ICommand ClearBatchCommand { get; }
+    public ICommand RemoveFromBatchCommand { get; }
+    public ICommand OpenBatchOutputCommand { get; }
+
+    // Batch methods
+    public void AddFilesToBatch(IEnumerable<string> paths)
+    {
+        if (paths == null) return;
+        var existing = new HashSet<string>(BatchItems.Select(b => b.InputPath), StringComparer.OrdinalIgnoreCase);
+        var added = 0;
+        foreach (var p in paths)
+        {
+            if (string.IsNullOrWhiteSpace(p)) continue;
+            var trimmed = p.Trim();
+            if (existing.Contains(trimmed)) continue;
+            if (!File.Exists(trimmed))
+            {
+                var failed = new BatchItem
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    InputPath = trimmed,
+                    FileName = Path.GetFileName(trimmed),
+                    DetectedFormat = DF.Unknown,
+                    State = BatchItemState.Failed,
+                    StatusMessage = "Dosya bulunamadı",
+                    Error = Error.NotFound($"File not found: {trimmed}"),
+                    Detections = Array.Empty<Detection>(),
+                    CreatedAt = DateTime.UtcNow
+                };
+                BatchItems.Add(new BatchItemViewModel(failed));
+                continue;
+            }
+            existing.Add(trimmed);
+            var item = new BatchItem
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                InputPath = trimmed,
+                FileName = Path.GetFileName(trimmed),
+                DetectedFormat = DF.Unknown,
+                State = BatchItemState.Queued,
+                StatusMessage = "Beklemede",
+                Detections = Array.Empty<Detection>(),
+                CreatedAt = DateTime.UtcNow
+            };
+            BatchItems.Add(new BatchItemViewModel(item));
+            added++;
+        }
+        if (added > 0)
+        {
+            BatchStatusMessage = $"{added} dosya kuyruğa eklendi. Toplam: {BatchItems.Count}";
+            OnPropertyChanged(nameof(BatchTotalCount));
+            OnPropertyChanged(nameof(CanStartBatch));
+        }
+    }
+
+    private void AddFilesToBatchViaDialog()
+    {
+        var filter = FileDialogService.SupportedFilesFilter;
+        var files = _fileDialogService.OpenFiles(filter, "Dosyaları Seç - Toplu İşlem");
+        if (files == null || files.Count == 0) return;
+        AddFilesToBatch(files);
+    }
+
+    private async Task StartBatchAsync()
+    {
+        if (_batchProcessor == null)
+        {
+            BatchStatusMessage = "Batch processor unavailable.";
+            return;
+        }
+        if (IsBatchProcessing || IsBusy) return;
+
+        // Collect paths to process: Queued + Failed (for retry) + Cancelled/Skipped could be retried
+        // But for initial start, process all Queued
+        var toProcess = BatchItems.Where(x => x.State == BatchItemState.Queued).Select(x => x.InputPath).ToList();
+        // If no queued but there are failed/cancelled and user clicked StartBatch, process queued only; retry uses dedicated command
+        if (toProcess.Count == 0)
+        {
+            // If user has no queued, but wants to start with all not-success: fallback to queued+failed
+            toProcess = BatchItems.Where(x => x.State != BatchItemState.Success && x.State != BatchItemState.Unsupported).Select(x => x.InputPath).ToList();
+            if (toProcess.Count == 0)
+            {
+                BatchStatusMessage = "İşlenecek dosya yok.";
+                return;
+            }
+        }
+
+        var request = new BatchRequest
+        {
+            InputPaths = toProcess,
+            Options = new RenderOptions
+            {
+                Mode = MaskingMode.FullRedaction,
+                UseTypePlaceholder = true,
+                SanitizeMetadata = true,
+                RemoveHiddenContent = true
+            },
+            ContinueOnError = true,
+            MaxDegreeOfParallelism = 1
+        };
+
+        _batchCts?.Dispose();
+        _batchCts = new CancellationTokenSource();
+        var token = _batchCts.Token;
+
+        try
+        {
+            IsBatchProcessing = true;
+            IsBusy = true;
+            BatchStatusMessage = $"Toplu işlem başlıyor ({toProcess.Count} dosya)...";
+            LastBatchResult = null;
+
+            // Progress reporter updates BatchItems in UI thread
+            var progress = new Progress<BatchItem>(item =>
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                Action update = () =>
+                {
+                    var vm = BatchItems.FirstOrDefault(x => string.Equals(x.InputPath, item.InputPath, StringComparison.OrdinalIgnoreCase));
+                    if (vm != null)
+                    {
+                        vm.Update(item);
+                    }
+                    else
+                    {
+                        // Should not happen, but add if missing
+                        BatchItems.Add(new BatchItemViewModel(item));
+                    }
+                    BatchStatusMessage = $"{item.FileName}: {item.StatusMessage} ({item.State})";
+                };
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(update);
+                else
+                    update();
+            });
+
+            var result = await _batchProcessor.ProcessAsync(request, progress, token).ConfigureAwait(false);
+
+            if (result.IsFailure)
+            {
+                BatchStatusMessage = $"Toplu işlem hatası: {result.Error.Message}";
+                await RunOnUiAsync(() => LastBatchResult = null).ConfigureAwait(false);
+                return;
+            }
+
+            var batchResult = result.Value;
+            await RunOnUiAsync(() =>
+            {
+                // Update all items to final state
+                foreach (var bi in batchResult.Items)
+                {
+                    var vm = BatchItems.FirstOrDefault(x => string.Equals(x.InputPath, bi.InputPath, StringComparison.OrdinalIgnoreCase));
+                    if (vm != null) vm.Update(bi);
+                    else BatchItems.Add(new BatchItemViewModel(bi));
+                }
+                LastBatchResult = batchResult;
+                OnPropertyChanged(nameof(BatchSuccessCount));
+                OnPropertyChanged(nameof(BatchFailedCount));
+                OnPropertyChanged(nameof(BatchUnsupportedCount));
+                OnPropertyChanged(nameof(BatchCancelledCount));
+                OnPropertyChanged(nameof(BatchTotalCount));
+                OnPropertyChanged(nameof(CanRetryFailed));
+            }).ConfigureAwait(false);
+
+            BatchStatusMessage = batchResult.IsCancelled
+                ? $"İptal edildi. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}"
+                : $"Tamamlandı. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}";
+        }
+        catch (OperationCanceledException)
+        {
+            BatchStatusMessage = "Toplu işlem iptal edildi.";
+        }
+        catch (Exception ex)
+        {
+            BatchStatusMessage = $"Toplu işlem hatası: {ex.Message}";
+        }
+        finally
+        {
+            IsBatchProcessing = false;
+            IsBusy = false;
+            OnPropertyChanged(nameof(CanStartBatch));
+            OnPropertyChanged(nameof(CanRetryFailed));
+        }
+    }
+
+    private async Task RetryFailedAsync()
+    {
+        if (_batchProcessor == null) return;
+        if (IsBatchProcessing) return;
+
+        var failedPaths = BatchItems.Where(x => x.State == BatchItemState.Failed).Select(x => x.InputPath).ToList();
+        if (failedPaths.Count == 0)
+        {
+            BatchStatusMessage = "Yeniden denenecek başarısız dosya yok.";
+            return;
+        }
+
+        // Reset failed items to Queued before retry
+        foreach (var vm in BatchItems.Where(x => x.State == BatchItemState.Failed).ToList())
+        {
+            var queued = new BatchItem
+            {
+                Id = vm.Id,
+                InputPath = vm.InputPath,
+                FileName = vm.FileName,
+                DetectedFormat = vm.DetectedFormat,
+                State = BatchItemState.Queued,
+                StatusMessage = "Yeniden denenecek",
+                Detections = Array.Empty<Detection>(),
+                CreatedAt = DateTime.UtcNow
+            };
+            vm.Update(queued);
+        }
+
+        await StartBatchAsync().ConfigureAwait(false);
+    }
+
+    private void CancelBatch()
+    {
+        try
+        {
+            _batchCts?.Cancel();
+            BatchStatusMessage = "İptal ediliyor...";
+        }
+        catch { }
+    }
+
+    private void ClearBatch()
+    {
+        if (IsBatchProcessing) return;
+        BatchItems.Clear();
+        LastBatchResult = null;
+        BatchStatusMessage = "Kuyruk temizlendi.";
+        OnPropertyChanged(nameof(BatchTotalCount));
+        OnPropertyChanged(nameof(BatchSuccessCount));
+        OnPropertyChanged(nameof(BatchFailedCount));
+        OnPropertyChanged(nameof(BatchUnsupportedCount));
+        OnPropertyChanged(nameof(BatchCancelledCount));
+    }
+
+    private void RemoveFromBatch(BatchItemViewModel vm)
+    {
+        if (IsBatchProcessing) return;
+        if (vm.State == BatchItemState.Processing)
+        {
+            BatchStatusMessage = "İşlenen dosya kaldırılamaz.";
+            return;
+        }
+        BatchItems.Remove(vm);
+        OnPropertyChanged(nameof(BatchTotalCount));
+        OnPropertyChanged(nameof(BatchSuccessCount));
+        OnPropertyChanged(nameof(BatchFailedCount));
+        OnPropertyChanged(nameof(CanStartBatch));
+        BatchStatusMessage = $"{vm.FileName} kuyruktan çıkarıldı.";
+    }
+
+    private void OpenBatchOutput(BatchItemViewModel vm)
+    {
+        if (string.IsNullOrWhiteSpace(vm.OutputPath) || !File.Exists(vm.OutputPath))
+        {
+            BatchStatusMessage = "Çıktı bulunamadı: " + vm.FileName;
+            return;
+        }
+        try
+        {
+            var psi = new ProcessStartInfo(vm.OutputPath) { UseShellExecute = true };
+            Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            BatchStatusMessage = $"Açılamadı: {ex.Message}";
+        }
+    }
+
+    private void OnBatchCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(BatchTotalCount));
+        OnPropertyChanged(nameof(BatchSuccessCount));
+        OnPropertyChanged(nameof(BatchFailedCount));
+        OnPropertyChanged(nameof(BatchUnsupportedCount));
+        OnPropertyChanged(nameof(BatchCancelledCount));
+        OnPropertyChanged(nameof(CanStartBatch));
+        OnPropertyChanged(nameof(CanRetryFailed));
+    }
 
     private async Task OpenFileAsync()
     {

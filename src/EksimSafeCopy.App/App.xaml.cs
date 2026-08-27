@@ -3,6 +3,7 @@ using EksimSafeCopy.App.Extensions;
 using EksimSafeCopy.App.Services;
 using EksimSafeCopy.App.ViewModels;
 using EksimSafeCopy.Detectors;
+using EksimSafeCopy.Infrastructure.Batch;
 using EksimSafeCopy.Ocr;
 using EksimSafeCopy.Renderer;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ public partial class App : Application
         services.AddDocumentEngine();
         services.AddDetectors();
         services.AddRenderer();
+        services.AddBatch();
 
         // App services
         services.AddSingleton<IFileDialogService, FileDialogService>();

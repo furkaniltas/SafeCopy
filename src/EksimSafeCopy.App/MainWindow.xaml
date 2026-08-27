@@ -6,7 +6,7 @@
         xmlns:vm="clr-namespace:EksimSafeCopy.App.ViewModels"
         xmlns:conv="clr-namespace:EksimSafeCopy.App.Converters"
         mc:Ignorable="d"
-        Title="Eksim SafeCopy" Height="820" Width="1280"
+        Title="Eksim SafeCopy" Height="900" Width="1280"
         WindowStartupLocation="CenterScreen"
         Background="White">
     <Window.Resources>
@@ -18,6 +18,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="64"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="32"/>
             <RowDefinition Height="56"/>
@@ -50,8 +51,172 @@
             </StackPanel>
         </Grid>
 
+        <!-- Batch Queue Panel -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Batch toolbar -->
+                <Grid Grid.Row="0" Background="#F8FAFC" Margin="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,8">
+                        <TextBlock Text="Toplu İşlem Kuyruğu" FontWeight="Bold" FontSize="13" Foreground="#0F2438" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BatchTotalCount, StringFormat=' ({0} dosya)'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        <TextBlock Text="{Binding BatchSuccessCount, StringFormat=' Başarılı: {0}'}" FontSize="11" Foreground="#2F8F4E" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <TextBlock Text="{Binding BatchFailedCount, StringFormat=' Başarısız: {0}'}" FontSize="11" Foreground="#B91C1C" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        <TextBlock Text="{Binding BatchUnsupportedCount, StringFormat=' Desteklenmiyor: {0}'}" FontSize="11" Foreground="#D97706" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        <TextBlock Text="{Binding BatchCancelledCount, StringFormat=' İptal: {0}'}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Button Content="Dosya Ekle" Command="{Binding AddFilesToBatchCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="12,5" Margin="0,0,6,0" FontSize="11"/>
+                        <Button Content="Başlat" Command="{Binding StartBatchCommand}" Background="#2F8F4E" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="İptal Et" Command="{Binding CancelBatchCommand}" Background="#64748B" Foreground="White" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Başarısızları Yeniden Dene" Command="{Binding RetryFailedCommand}" Background="White" Foreground="#0F2438" BorderBrush="#E5E7EB" BorderThickness="1" Padding="12,5" Margin="0,0,6,0" FontSize="11" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Temizle" Command="{Binding ClearBatchCommand}" Background="White" Foreground="#B91C1C" BorderBrush="#FECACA" BorderThickness="1" Padding="12,5" FontSize="11" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Batch ListView queue with columns -->
+                <Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0">
+                    <ListView ItemsSource="{Binding BatchItems}" BorderThickness="0" MaxHeight="160" MinHeight="80" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Dosya" Width="220">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding FileName}" FontSize="11" Foreground="#0F2438" ToolTip="{Binding InputPath}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Durum" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Setter Property="Fill" Value="#64748B"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding State}" Value="Success"><Setter Property="Fill" Value="#2F8F4E"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Fill" Value="#B91C1C"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Unsupported"><Setter Property="Fill" Value="#D97706"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Processing"><Setter Property="Fill" Value="#2563EB"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Queued"><Setter Property="Fill" Value="#94A3B8"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding State}" Value="Cancelled"><Setter Property="Fill" Value="#64748B"/></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
+                                                <TextBlock Text="{Binding StateText}" FontSize="11" Foreground="#334155" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Tespit" Width="90">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DetectionSummary}" FontSize="11" Foreground="#475569" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Doğrulama" Width="100">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding VerificationSummary}" FontSize="11" Foreground="#334155"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Çıktı" Width="240">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding OutputPath}" FontSize="10" Foreground="#64748B" ToolTip="{Binding OutputPath}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Mesaj" Width="200">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StatusMessage}" FontSize="10" Foreground="#94A3B8" ToolTip="{Binding StatusMessage}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="2"/>
+                                <Setter Property="ContextMenu">
+                                    <Setter.Value>
+                                        <ContextMenu>
+                                            <MenuItem Header="Çıktıyı Aç" Command="{Binding DataContext.OpenBatchOutputCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Kuyruktan Çıkar" Command="{Binding DataContext.RemoveFromBatchCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                </Border>
+
+                <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ProgressBar Width="100" Height="6" IsIndeterminate="True" Visibility="{Binding IsBatchProcessing, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding BatchStatusMessage}" FontSize="11" Foreground="#334155" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            <TextBlock Text=" | Sürükle &amp; Bırak ile çoklu dosya ekleyebilirsiniz." FontSize="10" Foreground="#94A3B8" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="Orijinal dosyalar asla üzerine yazılmaz." FontSize="10" Foreground="#2F8F4E" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
         <!-- Body 3 columns: 300 left, * center, 300 right -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300"/>
                 <ColumnDefinition Width="*"/>
@@ -307,7 +472,7 @@
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border Grid.Row="3" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -325,7 +490,7 @@
         </Border>
 
         <!-- Footer #FAFBFC with 4 groups horizontally centered, 7x7 dots, 26px gap -->
-        <Grid Grid.Row="3" Background="#FAFBFC">
+        <Grid Grid.Row="4" Background="#FAFBFC">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>

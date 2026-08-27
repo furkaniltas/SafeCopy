@@ -23,6 +23,7 @@ class FakeFileDialogService : IFileDialogService
     public string? ReturnPath { get; set; }
     public string? OpenFile(string filter, string title) => ReturnPath;
     public string? SaveFile(string filter, string defaultFileName, string title) => ReturnPath;
+    public IReadOnlyList<string>? OpenFiles(string filter, string title) => ReturnPath != null ? new[] { ReturnPath } : null;
 }
 
 public class MainViewModelTests

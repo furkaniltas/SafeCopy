@@ -28,6 +28,22 @@ public sealed class FileDialogService : IFileDialogService
         return result == true ? dialog.FileName : null;
     }
 
+    public IReadOnlyList<string>? OpenFiles(string filter, string title = "Dosya Seç")
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = string.IsNullOrWhiteSpace(filter) ? DefaultFilter : filter,
+            Title = title,
+            CheckFileExists = true,
+            Multiselect = true
+        };
+
+        var result = dialog.ShowDialog();
+        if (result == true && dialog.FileNames != null && dialog.FileNames.Length > 0)
+            return dialog.FileNames.ToList().AsReadOnly();
+        return null;
+    }
+
     public string? SaveFile(string filter, string defaultFileName, string title = "Farklı Kaydet")
     {
         var dialog = new SaveFileDialog
