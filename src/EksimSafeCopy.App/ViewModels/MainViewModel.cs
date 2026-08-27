@@ -445,6 +445,14 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(CanRetryFailed));
             }).ConfigureAwait(false);
 
+            // After batch completes, load the first successful item into main UI for preview
+            var firstSuccess = batchResult.Items.FirstOrDefault(x => x.State == BatchItemState.Success);
+            if (firstSuccess != null && !string.IsNullOrWhiteSpace(firstSuccess.OutputPath) && File.Exists(firstSuccess.OutputPath))
+            {
+                await LoadAndDetectAsync(firstSuccess.OutputPath).ConfigureAwait(false);
+                SelectedFilePath = firstSuccess.OutputPath;
+            }
+
             BatchStatusMessage = batchResult.IsCancelled
                 ? $"İptal edildi. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}"
                 : $"Tamamlandı. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}";
@@ -659,6 +667,9 @@ public sealed class MainViewModel : ViewModelBase
 
             // Build preview from Document model (not direct file)
             await BuildPreviewAsync(document, token).ConfigureAwait(false);
+
+            // Load image preview if applicable
+            TryLoadImagePreview(document);
 
             // Detection phase
             await RunDetectionAsync(document).ConfigureAwait(false);
@@ -943,6 +954,9 @@ public sealed class MainViewModel : ViewModelBase
             // Only now claim success
             ProcessingState = ProcessingState.Success;
             StatusMessage = $"Güvenli kopya hazır: {Path.GetFileName(outputPath)} | Doğrulama geçti | SHA256 korundu.";
+
+            // Keep original document reference and preview (original file unchanged)
+            // Output file is separate - user can open it via OpenOutputCommand
         }
         catch (OperationCanceledException)
         {
