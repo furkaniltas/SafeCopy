@@ -360,6 +360,30 @@ public class TxtRedactorTests
         finally { File.Delete(tempFile); }
     }
 
+    [Fact]
+    public void Redact_TesisatNo_PreservesLabel()
+    {
+        var content = "Tesisat No : 12132133\nAD Soyad : Furkan İltaş";
+        var tempFile = CreateTempTxt(content);
+        try
+        {
+            var tesisatIdx = content.IndexOf("12132133");
+            var detections = new[]
+            {
+                new Detection { Type = DetectionType.TesisatNo, Value = "12132133", TextSpan = new TextSpan { StartIndex = tesisatIdx, Length = 8, Text = "12132133" } }
+            };
+            var plan = CreatePlanFromDetections(detections);
+            var result = _redactor.Redact(File.ReadAllBytes(tempFile), plan, new RenderOptions());
+            result.IsSuccess.Should().BeTrue();
+            var output = Encoding.UTF8.GetString(result.Value);
+            output.Should().Contain("Tesisat No :");
+            output.Should().NotContain("12132133");
+            // Label preserved, value replaced with type placeholder (e.g., [TesisatNo] or [TESISAT_NO])
+            output.Should().Contain("Tesisat No : [");
+        }
+        finally { File.Delete(tempFile); }
+    }
+
     private RedactionPlan CreatePlan(string filePath)
     {
         var detection1 = new Detection 

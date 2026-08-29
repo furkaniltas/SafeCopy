@@ -53,14 +53,18 @@ private static readonly Regex InstallationPattern = new(
 
             double confidence = CalculateConfidence(candidate, contextFeatures, matchContextFeatures);
             
-            var originalStart = normalizedText.MapToOriginalPosition(match.Index);
-            var originalEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
+            // TextSpan must cover ONLY the PII value, not the label (e.g., "12132133" not "Tesisat No : 12132133")
+            var numberMatch = Regex.Match(match.Value, @"[A-Z0-9]{6,20}", RegexOptions.IgnoreCase);
+            var numberStartInMatch = numberMatch.Success ? numberMatch.Index : match.Value.IndexOf(candidate, StringComparison.OrdinalIgnoreCase);
+            if (numberStartInMatch < 0) numberStartInMatch = 0;
+            var originalStart = normalizedText.MapToOriginalPosition(match.Index + numberStartInMatch);
+            var originalEnd = normalizedText.MapToOriginalPosition(match.Index + numberStartInMatch + candidate.Length);
             
             var textSpan = new TextSpan
             {
                 StartIndex = originalStart,
                 Length = originalEnd - originalStart,
-                Text = match.Value,
+                Text = candidate,
                 BoundingBox = BoundingBox.Empty
             };
 

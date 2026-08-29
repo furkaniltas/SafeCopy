@@ -125,4 +125,18 @@ public class InstallationNumberDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainSingle(d => d.Type == DetectionType.TesisatNo && d.Value == "ABC123456");
     }
+
+    [Fact]
+    public void Detect_TesisatNo_TextSpanCoversOnlyValue()
+    {
+        var document = CreateDocument("Tesisat No : 12132133");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detection = result.Value.Should().ContainSingle(d => d.Type == DetectionType.TesisatNo && d.Value == "12132133").Subject;
+        detection.TextSpan!.Text.Should().Be("12132133");
+        detection.TextSpan!.Text.Should().NotContain("Tesisat");
+        detection.TextSpan!.Length.Should().Be("12132133".Length);
+    }
 }
