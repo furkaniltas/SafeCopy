@@ -344,6 +344,70 @@ public class Phase13RegressionTests
             }
         }
     }
+
+    [Fact]
+    public async Task Batch_Completion_PreviewShowsOriginalDocument()
+    {
+        var txt = CreateTxt("Tesisat No : 12132133\nAD Soyad : Furkan İltaş");
+        try
+        {
+            var vm = CreateProvider().GetRequiredService<MainViewModel>();
+            vm.AddFilesToBatch(new[] { txt });
+            vm.BatchItems.Should().HaveCount(1);
+            vm.CanStartBatch.Should().BeTrue();
+
+            await vm.StartBatchAsyncForTest2();
+
+            // Batch should complete successfully
+            vm.LastBatchResult.Should().NotBeNull();
+            vm.LastBatchResult!.TotalCount.Should().Be(1);
+            vm.LastBatchResult.SuccessCount.Should().Be(1);
+            vm.BatchSuccessCount.Should().Be(1);
+
+            // Preview should show ORIGINAL document
+            vm.CurrentDocument.Should().NotBeNull("CurrentDocument should be set after batch completion");
+            vm.CurrentDocument!.Source.FilePath.Should().Be(txt);
+            vm.CurrentDocument.Format.Should().Be(DF.Txt);
+            vm.PreviewText.Should().NotBeNullOrEmpty("PreviewText should contain original document content");
+            vm.PreviewText.Should().Contain("Tesisat No");
+            vm.PreviewText.Should().Contain("Furkan");
+            vm.Detections.Should().NotBeEmpty("Detections should be populated");
+            vm.SelectedFilePath.Should().Be(txt);
+        }
+        finally { File.Delete(txt); }
+    }
+
+    [Fact]
+    public async Task Batch_Completion_DoesNotClearPreview()
+    {
+        // Test that preview remains after single file batch
+        var txt = CreateTxt("TC: 10000000146\nAd: Ahmet Yılmaz");
+        try
+        {
+            var vm = CreateProvider().GetRequiredService<MainViewModel>();
+            vm.AddFilesToBatch(new[] { txt });
+            await vm.StartBatchAsyncForTest2();
+
+            // Preview should be populated
+            vm.CurrentDocument.Should().NotBeNull();
+            vm.PreviewText.Length.Should().BeGreaterThan(0);
+            vm.Detections.Count.Should().BeGreaterThan(0);
+
+            // Add another file and start again - preview should not be cleared between batches
+            var txt2 = CreateTxt("Email: test@example.com");
+            try
+            {
+                vm.AddFilesToBatch(new[] { txt2 });
+                await vm.StartBatchAsyncForTest2();
+
+                vm.CurrentDocument.Should().NotBeNull();
+                vm.PreviewText.Length.Should().BeGreaterThan(0);
+                vm.Detections.Count.Should().BeGreaterThan(0);
+            }
+            finally { File.Delete(txt2); }
+        }
+        finally { File.Delete(txt); }
+    }
 }
 
 static class Phase13Extensions

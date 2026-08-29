@@ -423,10 +423,30 @@
                         </Style>
                     </ScrollViewer.Style>
                     <Grid>
-                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="16" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="16">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <TextBlock Text="{Binding PreviewText}" FontFamily="Consolas" FontSize="11" Foreground="#1E293B" TextWrapping="Wrap"/>
                         </Border>
-                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="8" Visibility="{Binding PreviewImage, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border Background="White" CornerRadius="6" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="1" Padding="8">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="600"/>
                         </Border>
                     </Grid>

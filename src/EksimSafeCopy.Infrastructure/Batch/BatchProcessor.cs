@@ -1,10 +1,39 @@
 namespace EksimSafeCopy.Infrastructure.Batch;
 
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.DocumentEngine.Security;
-using System.Diagnostics;
 using CoreHashAlgorithm = EksimSafeCopy.Core.Abstractions.HashAlgorithm;
+
+internal static class BatchDiagLog
+{
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "EksimSafeCopy", "batch_diag.log");
+    private static readonly object _lock = new();
+
+    static BatchDiagLog()
+    {
+        try { Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!); } catch { }
+    }
+
+    public static void Write(string msg, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
+    {
+        var tid = Thread.CurrentThread.ManagedThreadId;
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        var lineStr = $"[{timestamp}] TID={tid} {caller}:{line} | {msg}";
+        try
+        {
+            lock (_lock) File.AppendAllText(LogPath, lineStr + Environment.NewLine);
+        }
+        catch { }
+        Debug.WriteLine(lineStr);
+    }
+}
 
 public sealed class BatchProcessor : IBatchProcessor
 {
@@ -237,7 +266,7 @@ public sealed class BatchProcessor : IBatchProcessor
         VerificationResult? verification = null;
         SecureTempWorkspace? tempWorkspace = null;
 
-        void Report(BatchItemState state, string message, Error? err = null, string? outPath = null, VerificationResult? ver = null, IReadOnlyList<Detection>? dets = null, DocumentFormat? fmt = null, TimeSpan? dur = null)
+void Report(BatchItemState state, string message, Error? err = null, string? outPath = null, VerificationResult? ver = null, IReadOnlyList<Detection>? dets = null, DocumentFormat? fmt = null, TimeSpan? dur = null)
         {
             var item = new BatchItem
             {
@@ -256,6 +285,8 @@ public sealed class BatchProcessor : IBatchProcessor
                 CreatedAt = DateTime.UtcNow,
                 Duration = dur ?? sw.Elapsed
             };
+
+            BatchDiagLog.Write($"Report: State={state}, Msg={message}, OutputPath={item.OutputPath ?? "null"}, Detections={item.Detections?.Count ?? 0}");
             progress?.Report(item);
         }
 
@@ -582,8 +613,10 @@ public sealed class BatchProcessor : IBatchProcessor
             }
 
             // 10. IVerificationEngine.Verify on output
+            BatchDiagLog.Write($"ProcessSingleFileAsync: Starting verification on {outputPath}");
             Report(BatchItemState.Processing, "Doğrulama yapılıyor...", outPath: outputPath, dets: detections);
             var verifyResult = await Task.Run(() => _verificationEngine.Verify(outputPath, detectedFormat, cancellationToken), cancellationToken).ConfigureAwait(false);
+            BatchDiagLog.Write($"ProcessSingleFileAsync: Verification returned IsSuccess={verifyResult.IsSuccess}, Passed={verifyResult.Value?.Passed}, Residual={verifyResult.Value?.TotalResidualCount}");
             if (verifyResult.IsFailure)
             {
                 sw.Stop();
@@ -610,10 +643,11 @@ public sealed class BatchProcessor : IBatchProcessor
             }
 
             verification = verifyResult.Value;
-            if (!verification.Passed)
+            if (verification == null || !verification.Passed)
             {
                 sw.Stop();
-                var err = Error.SecurityError($"Verification failed: {verification.TotalResidualCount} residual PII found");
+                var residualMsg = verification?.TotalResidualCount > 0 ? $" {verification.TotalResidualCount} residual PII found" : "verification returned null or failed";
+                var err = Error.SecurityError($"Verification failed:{residualMsg}");
                 TryDeleteFile(outputPath);
                 TryDeleteFile(tempOutput);
                 Report(BatchItemState.Failed, err.Message, err, ver: verification, dets: detections, dur: sw.Elapsed);
@@ -639,7 +673,7 @@ public sealed class BatchProcessor : IBatchProcessor
             var outHashResult = await Task.Run(() => _fileSystem.ComputeHash(outputPath, CoreHashAlgorithm.SHA256), cancellationToken).ConfigureAwait(false);
             if (outHashResult.IsSuccess) outputHash = outHashResult.Value;
 
-            // Enforce SUCCESS invariants: output must exist, be different from input, hash preserved, verification passed with 0 residual, no exception
+            // Enforce SUCCESS invariants
             bool outputExists = File.Exists(outputPath);
             bool outputDifferentFromInput = !string.Equals(outputPath, inputPath, StringComparison.OrdinalIgnoreCase) && outputExists;
             bool hashPreserved = postHash.IsSuccess && originalHash != null && postHash.Value == originalHash;
@@ -649,6 +683,8 @@ public sealed class BatchProcessor : IBatchProcessor
             bool noMetadataIssues = verification.MetadataIssues.Count == 0;
             bool noHiddenIssues = verification.HiddenContentIssues.Count == 0;
             bool outputHashExists = !string.IsNullOrEmpty(outputHash);
+
+            BatchDiagLog.Write($"ProcessSingleFileAsync: OutputHash={outputHash ?? "null"}, outputExists={outputExists}, different={outputDifferentFromInput}, hashPreserved={hashPreserved}, passed={verificationPassed}, residual={verification.TotalResidualCount}");
 
             bool allInvariants = outputExists && outputDifferentFromInput && hashPreserved && verificationPassed && zeroResidual && zeroCritical && noMetadataIssues && noHiddenIssues && outputHashExists;
 
@@ -660,6 +696,7 @@ public sealed class BatchProcessor : IBatchProcessor
                 TryDeleteFile(outputPath);
                 TryDeleteFile(tempOutput);
                 sw.Stop();
+                BatchDiagLog.Write($"ProcessSingleFileAsync: INVARIANT FAILURE - {invariantError.Message}");
                 Report(BatchItemState.Failed, invariantError.Message, invariantError, ver: verification, dets: detections, dur: sw.Elapsed);
                 CleanupTempWorkspace(tempWorkspace);
                 return new BatchItem
@@ -680,6 +717,7 @@ public sealed class BatchProcessor : IBatchProcessor
             }
 
             sw.Stop();
+            BatchDiagLog.Write($"ProcessSingleFileAsync: ALL INVARIANTS PASSED - Reporting SUCCESS, OutputPath={outputPath}");
             Report(BatchItemState.Success, "Tamamlandı", outPath: outputPath, ver: verification, dets: detections, dur: sw.Elapsed);
             CleanupTempWorkspace(tempWorkspace);
 

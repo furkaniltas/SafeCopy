@@ -393,10 +393,11 @@ public sealed class MainViewModel : ViewModelBase
             BatchStatusMessage = $"Toplu işlem başlıyor ({toProcess.Count} dosya)...";
             LastBatchResult = null;
 
-            // Progress reporter updates BatchItems in UI thread
+            // Progress reporter - ALWAYS marshal via Dispatcher
             var progress = new Progress<BatchItem>(item =>
             {
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher == null) return;
                 Action update = () =>
                 {
                     var vm = BatchItems.FirstOrDefault(x => string.Equals(x.InputPath, item.InputPath, StringComparison.OrdinalIgnoreCase));
@@ -411,10 +412,7 @@ public sealed class MainViewModel : ViewModelBase
                     }
                     BatchStatusMessage = $"{item.FileName}: {item.StatusMessage} ({item.State})";
                 };
-                if (dispatcher != null && !dispatcher.CheckAccess())
-                    dispatcher.Invoke(update);
-                else
-                    update();
+                dispatcher.BeginInvoke(update);
             });
 
             var result = await _batchProcessor.ProcessAsync(request, progress, token).ConfigureAwait(false);
@@ -445,17 +443,24 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(CanRetryFailed));
             }).ConfigureAwait(false);
 
-            // After batch completes, load the first successful item into main UI for preview
+            // After batch completes, load the first successful item's ORIGINAL file for preview
+            // Run entire LoadAndDetectAsync on UI thread so all internal RunOnUiAsync calls execute inline
             var firstSuccess = batchResult.Items.FirstOrDefault(x => x.State == BatchItemState.Success);
-            if (firstSuccess != null && !string.IsNullOrWhiteSpace(firstSuccess.OutputPath) && File.Exists(firstSuccess.OutputPath))
+            if (firstSuccess != null && !string.IsNullOrWhiteSpace(firstSuccess.InputPath) && File.Exists(firstSuccess.InputPath))
             {
-                await LoadAndDetectAsync(firstSuccess.OutputPath).ConfigureAwait(false);
-                SelectedFilePath = firstSuccess.OutputPath;
+                await RunOnUiAsync(async () =>
+                {
+                    await LoadAndDetectAsync(firstSuccess.InputPath);
+                    SelectedFilePath = firstSuccess.InputPath;
+                }).ConfigureAwait(false);
             }
 
-            BatchStatusMessage = batchResult.IsCancelled
-                ? $"İptal edildi. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}"
-                : $"Tamamlandı. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}";
+            await RunOnUiAsync(() =>
+            {
+                BatchStatusMessage = batchResult.IsCancelled
+                    ? $"İptal edildi. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}"
+                    : $"Tamamlandı. Başarılı: {batchResult.SuccessCount}, Başarısız: {batchResult.FailedCount}, Desteklenmiyor: {batchResult.UnsupportedCount}";
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -582,7 +587,7 @@ public sealed class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path))
             return;
 
-        SelectedFilePath = path;
+        await RunOnUiAsync(() => SelectedFilePath = path).ConfigureAwait(false);
         await LoadAndDetectAsync(path).ConfigureAwait(false);
     }
 
@@ -590,7 +595,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(SelectedFilePath) || CurrentDocument == null)
         {
-            StatusMessage = "Önce bir dosya seçin.";
+            await RunOnUiAsync(() => StatusMessage = "Önce bir dosya seçin.").ConfigureAwait(false);
             return;
         }
 
@@ -605,25 +610,32 @@ public sealed class MainViewModel : ViewModelBase
 
         try
         {
-            IsBusy = true;
-            ProcessingState = ProcessingState.Loading;
-            StatusMessage = "Dosya doğrulanıyor...";
-            UnsupportedMessage = null;
-            VerificationResult = null;
-            OutputPath = null;
-            Detections.Clear();
-            PreviewText = string.Empty;
-            PreviewImage = null;
-            OriginalHash = null;
-            CurrentHash = null;
+            // Reset UI state on UI thread
+            await RunOnUiAsync(() =>
+            {
+                IsBusy = true;
+                ProcessingState = ProcessingState.Loading;
+                StatusMessage = "Dosya doğrulanıyor...";
+                UnsupportedMessage = null;
+                VerificationResult = null;
+                OutputPath = null;
+                Detections.Clear();
+                PreviewText = string.Empty;
+                PreviewImage = null;
+                OriginalHash = null;
+                CurrentHash = null;
+            }).ConfigureAwait(false);
 
             // Format validation + security validation executed on background thread via DocumentEngine internally
             // Compute original hash before ingestion for immutability proof
             var hashResult = await Task.Run(() => _fileSystem.ComputeHash(filePath, HashAlgorithm.SHA256), token).ConfigureAwait(false);
             if (hashResult.IsSuccess)
             {
-                OriginalHash = hashResult.Value;
-                await RunOnUiAsync(() => StatusMessage = $"Orijinal dosya hash (SHA256): {OriginalHash[..16]}...").ConfigureAwait(false);
+                await RunOnUiAsync(() =>
+                {
+                    OriginalHash = hashResult.Value;
+                    StatusMessage = $"Orijinal dosya hash (SHA256): {OriginalHash[..16]}...";
+                }).ConfigureAwait(false);
             }
             else
             {
@@ -638,16 +650,21 @@ public sealed class MainViewModel : ViewModelBase
 
             if (token.IsCancellationRequested)
             {
-                ProcessingState = ProcessingState.Cancelled;
-                StatusMessage = "İşlem iptal edildi.";
+                await RunOnUiAsync(() =>
+                {
+                    ProcessingState = ProcessingState.Cancelled;
+                    StatusMessage = "İşlem iptal edildi.";
+                }).ConfigureAwait(false);
                 return;
             }
 
             if (ingestionResult.IsFailure)
             {
-                ProcessingState = ProcessingState.Failed;
-                // Use Result/Error message, no stack trace
-                StatusMessage = $"Dosya yüklenemedi: {ingestionResult.Error.Message}";
+                await RunOnUiAsync(() =>
+                {
+                    ProcessingState = ProcessingState.Failed;
+                    StatusMessage = $"Dosya yüklenemedi: {ingestionResult.Error.Message}";
+                }).ConfigureAwait(false);
                 return;
             }
 
@@ -659,11 +676,17 @@ public sealed class MainViewModel : ViewModelBase
             var postHashResult = await Task.Run(() => _fileSystem.ComputeHash(filePath, HashAlgorithm.SHA256), token).ConfigureAwait(false);
             if (postHashResult.IsSuccess && OriginalHash != null && postHashResult.Value != OriginalHash)
             {
-                ProcessingState = ProcessingState.Failed;
-                StatusMessage = "GÜVENLİK HATASI: Orijinal dosya değiştirildi!";
+                await RunOnUiAsync(() =>
+                {
+                    ProcessingState = ProcessingState.Failed;
+                    StatusMessage = "GÜVENLİK HATASI: Orijinal dosya değiştirildi!";
+                }).ConfigureAwait(false);
                 return;
             }
-            CurrentHash = postHashResult.IsSuccess ? postHashResult.Value : OriginalHash;
+            await RunOnUiAsync(() =>
+            {
+                CurrentHash = postHashResult.IsSuccess ? postHashResult.Value : OriginalHash;
+            }).ConfigureAwait(false);
 
             // Build preview from Document model (not direct file)
             await BuildPreviewAsync(document, token).ConfigureAwait(false);
@@ -676,18 +699,23 @@ public sealed class MainViewModel : ViewModelBase
         }
         catch (OperationCanceledException)
         {
-            ProcessingState = ProcessingState.Cancelled;
-            StatusMessage = "İşlem iptal edildi.";
+            await RunOnUiAsync(() =>
+            {
+                ProcessingState = ProcessingState.Cancelled;
+                StatusMessage = "İşlem iptal edildi.";
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            ProcessingState = ProcessingState.Failed;
-            // No stack trace exposed to user
-            StatusMessage = $"Beklenmeyen hata: {ex.Message}";
+            await RunOnUiAsync(() =>
+            {
+                ProcessingState = ProcessingState.Failed;
+                StatusMessage = $"Beklenmeyen hata: {ex.Message}";
+            }).ConfigureAwait(false);
         }
         finally
         {
-            IsBusy = false;
+            await RunOnUiAsync(() => IsBusy = false).ConfigureAwait(false);
         }
     }
 
@@ -696,23 +724,32 @@ public sealed class MainViewModel : ViewModelBase
         var token = _cts?.Token ?? CancellationToken.None;
         try
         {
-            IsBusy = true;
-            ProcessingState = ProcessingState.Detecting;
-            StatusMessage = "PII taraması yapılıyor...";
+            await RunOnUiAsync(() =>
+            {
+                IsBusy = true;
+                ProcessingState = ProcessingState.Detecting;
+                StatusMessage = "PII taraması yapılıyor...";
+            }).ConfigureAwait(false);
 
             var detectResult = await Task.Run(() => _detectionEngine.Detect(document, token), token).ConfigureAwait(false);
 
             if (token.IsCancellationRequested)
             {
-                ProcessingState = ProcessingState.Cancelled;
-                StatusMessage = "Tarama iptal edildi.";
+                await RunOnUiAsync(() =>
+                {
+                    ProcessingState = ProcessingState.Cancelled;
+                    StatusMessage = "Tarama iptal edildi.";
+                }).ConfigureAwait(false);
                 return;
             }
 
             if (detectResult.IsFailure)
             {
-                ProcessingState = ProcessingState.Failed;
-                StatusMessage = $"Tarama başarısız: {detectResult.Error.Message}";
+                await RunOnUiAsync(() =>
+                {
+                    ProcessingState = ProcessingState.Failed;
+                    StatusMessage = $"Tarama başarısız: {detectResult.Error.Message}";
+                }).ConfigureAwait(false);
                 return;
             }
 
@@ -749,37 +786,49 @@ public sealed class MainViewModel : ViewModelBase
             {
                 if (detections.Any())
                 {
-                    ProcessingState = ProcessingState.Unsupported;
-                    UnsupportedMessage = "PDF redaction şu anda güvenli olarak desteklenmiyor.";
-                    if (document.Format == DF.Udf)
-                        UnsupportedMessage = "UDF redaction şu anda güvenli olarak desteklenmiyor.";
-                    StatusMessage = UnsupportedMessage + " Dosya güvenli şekilde maskelenemedi, çıktı oluşturulmadı.";
+                    await RunOnUiAsync(() =>
+                    {
+                        ProcessingState = ProcessingState.Unsupported;
+                        UnsupportedMessage = document.Format == DF.Pdf
+                            ? "PDF redaction şu anda güvenli olarak desteklenmiyor."
+                            : "UDF redaction şu anda güvenli olarak desteklenmiyor.";
+                        StatusMessage = UnsupportedMessage + " Dosya güvenli şekilde maskelenemedi, çıktı oluşturulmadı.";
+                    }).ConfigureAwait(false);
                     return;
                 }
             }
 
-            ProcessingState = ProcessingState.Ready;
-            StatusMessage = detections.Count == 0
-                ? "PII bulunamadı. Maskeleme gereksiz."
-                : $"{detections.Count} adet PII bulundu. Maskelenecek öğeleri seçin ve 'Maskele' butonuna basın.";
+            await RunOnUiAsync(() =>
+            {
+                ProcessingState = ProcessingState.Ready;
+                StatusMessage = detections.Count == 0
+                    ? "PII bulunamadı. Maskeleme gereksiz."
+                    : $"{detections.Count} adet PII bulundu. Maskelenecek öğeleri seçin ve 'Maskele' butonuna basın.";
 
-            // Set hash display after successful detection
-            if (OriginalHash != null)
-                StatusMessage += $" | SHA256: {OriginalHash[..12]}... doğrulanmış.";
+                // Set hash display after successful detection
+                if (OriginalHash != null)
+                    StatusMessage += $" | SHA256: {OriginalHash[..12]}... doğrulanmış.";
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            ProcessingState = ProcessingState.Cancelled;
-            StatusMessage = "Tarama iptal edildi.";
+            await RunOnUiAsync(() =>
+            {
+                ProcessingState = ProcessingState.Cancelled;
+                StatusMessage = "Tarama iptal edildi.";
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            ProcessingState = ProcessingState.Failed;
-            StatusMessage = $"Tarama hatası: {ex.Message}";
+            await RunOnUiAsync(() =>
+            {
+                ProcessingState = ProcessingState.Failed;
+                StatusMessage = $"Tarama hatası: {ex.Message}";
+            }).ConfigureAwait(false);
         }
         finally
         {
-            IsBusy = false;
+            await RunOnUiAsync(() => IsBusy = false).ConfigureAwait(false);
         }
     }
 
@@ -1177,6 +1226,19 @@ public sealed class MainViewModel : ViewModelBase
         else
         {
             action();
+        }
+    }
+
+    private static async Task RunOnUiAsync(Func<Task> action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            await dispatcher.InvokeAsync(action).Task.Unwrap().ConfigureAwait(false);
+        }
+        else
+        {
+            await action();
         }
     }
 }
