@@ -42,34 +42,37 @@ public sealed class DocxRedactor : IRedactor
 
             foreach (var paragraph in body.Descendants<Paragraph>())
             {
-                foreach (var run in paragraph.Elements<Run>())
+                // Use paragraph-level text to handle split runs (e.g., "Ahmet " + "Yılmaz" across two w:t)
+                var paraText = paragraph.InnerText;
+                var needsRedaction = sortedOps.Any(op => !string.IsNullOrEmpty(op.TextSpan!.Text) && paraText.Contains(op.TextSpan!.Text));
+                if (!needsRedaction) continue;
+
+                // Collect all Text elements in this paragraph (including those inside Hyperlink/SmartTag)
+                var textElements = paragraph.Descendants<Text>().ToList();
+                if (textElements.Count == 0) continue;
+
+                // Build combined text and perform replacements
+                var combined = string.Concat(textElements.Select(t => t.Text));
+                var newCombined = combined;
+                foreach (var op in sortedOps)
                 {
-                    var textElements = run.Elements<Text>().ToList();
-                    foreach (var text in textElements)
-                    {
-                        var textContent = text.Text;
-                        if (string.IsNullOrEmpty(textContent)) continue;
+                    var spanText = op.TextSpan!.Text;
+                    if (string.IsNullOrEmpty(spanText)) continue;
+                    if (!newCombined.Contains(spanText)) continue;
+                    var replacement = op.Strategy == RedactionStrategy.FullRedaction
+                        ? new string('█', spanText.Length)
+                        : op.ReplacementText ?? string.Empty;
+                    newCombined = newCombined.Replace(spanText, replacement);
+                }
+                if (newCombined == combined) continue;
 
-                        var newContent = textContent;
-                        foreach (var op in sortedOps)
-                        {
-                            var spanText = op.TextSpan!.Text;
-                            if (string.IsNullOrEmpty(spanText)) continue;
-                            if (!newContent.Contains(spanText)) continue;
-
-                            var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                                ? new string('█', spanText.Length)
-                                : op.ReplacementText ?? string.Empty;
-
-                            newContent = newContent.Replace(spanText, replacement);
-                        }
-
-                        if (newContent != textContent)
-                        {
-                            text.Text = newContent;
-                            text.Space = SpaceProcessingModeValues.Preserve;
-                        }
-                    }
+                // Distribute newCombined back to Text elements - simplest: first Text gets all, rest cleared
+                // Preserves at least the redacted content; formatting of split runs is secondary to security
+                textElements[0].Text = newCombined;
+                textElements[0].Space = SpaceProcessingModeValues.Preserve;
+                for (int i = 1; i < textElements.Count; i++)
+                {
+                    textElements[i].Text = string.Empty;
                 }
             }
 
@@ -123,8 +126,46 @@ public sealed class DocxRedactor : IRedactor
                 }
             }
 
-            // Sanitize custom properties (docProps/custom.xml) - clear if contains PII-like
-            // Producer/Creator handled via extended properties sanitization in Verification
+            // Sanitize metadata - clear all PII-bearing properties
+            try
+            {
+                var props = document.PackageProperties;
+                props.Creator = string.Empty;
+                props.LastModifiedBy = string.Empty;
+                props.Title = string.Empty;
+                props.Subject = string.Empty;
+                props.Keywords = string.Empty;
+                props.Description = string.Empty;
+                props.Category = string.Empty;
+                // Remove custom properties part if exists
+                if (document.CustomFilePropertiesPart != null)
+                    document.DeletePart(document.CustomFilePropertiesPart);
+                if (document.ExtendedFilePropertiesPart != null)
+                {
+                    var extProps = document.ExtendedFilePropertiesPart.Properties;
+                    if (extProps != null)
+                    {
+                        // Clear company/manager which may contain PII
+                        var company = extProps.GetFirstChild<global::DocumentFormat.OpenXml.ExtendedProperties.Company>();
+                        if (company != null) company.Text = string.Empty;
+                        var manager = extProps.GetFirstChild<global::DocumentFormat.OpenXml.ExtendedProperties.Manager>();
+                        if (manager != null) manager.Text = string.Empty;
+                    }
+                }
+            }
+            catch { /* best effort */ }
+
+            // Also redact footnotes/endnotes if present
+            if (mainPart.FootnotesPart?.Footnotes != null)
+            {
+                foreach (var fn in mainPart.FootnotesPart.Footnotes.Elements<Footnote>())
+                    RedactCompositeElement(fn, sortedOps, options);
+            }
+            if (mainPart.EndnotesPart?.Endnotes != null)
+            {
+                foreach (var en in mainPart.EndnotesPart.Endnotes.Elements<Endnote>())
+                    RedactCompositeElement(en, sortedOps, options);
+            }
 
             mainPart.Document.Save();
             document.Save();
@@ -147,42 +188,30 @@ public sealed class DocxRedactor : IRedactor
 
     private void RedactHeaderFooter(OpenXmlCompositeElement element, List<RedactionOperation> operations, RenderOptions options)
     {
-        var sortedOps = operations
-            .Where(o => o.State == RedactionOperationState.Pending && o.TextSpan != null)
-            .OrderByDescending(o => o.TextSpan!.Text.Length)
-            .ToList();
+        RedactCompositeElement(element, operations.Where(o => o.State == RedactionOperationState.Pending && o.TextSpan != null).OrderByDescending(o => o.TextSpan!.Text.Length).ToList(), options);
+    }
 
+    private void RedactCompositeElement(OpenXmlCompositeElement element, List<RedactionOperation> sortedOps, RenderOptions options)
+    {
         foreach (var paragraph in element.Descendants<Paragraph>())
         {
-            foreach (var run in paragraph.Elements<Run>())
+            var paraText = paragraph.InnerText;
+            if (!sortedOps.Any(op => !string.IsNullOrEmpty(op.TextSpan!.Text) && paraText.Contains(op.TextSpan!.Text))) continue;
+            var textElements = paragraph.Descendants<Text>().ToList();
+            if (textElements.Count == 0) continue;
+            var combined = string.Concat(textElements.Select(t => t.Text));
+            var newCombined = combined;
+            foreach (var op in sortedOps)
             {
-                var textElements = run.Elements<Text>().ToList();
-                foreach (var text in textElements)
-                {
-                    var textContent = text.Text;
-                    if (string.IsNullOrEmpty(textContent)) continue;
-
-                    var newContent = textContent;
-                    foreach (var op in sortedOps)
-                    {
-                        var spanText = op.TextSpan!.Text;
-                        if (string.IsNullOrEmpty(spanText)) continue;
-                        if (!newContent.Contains(spanText)) continue;
-
-                        var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                            ? new string('█', spanText.Length)
-                            : op.ReplacementText ?? string.Empty;
-
-                        newContent = newContent.Replace(spanText, replacement);
-                    }
-
-                    if (newContent != textContent)
-                    {
-                        text.Text = newContent;
-                        text.Space = SpaceProcessingModeValues.Preserve;
-                    }
-                }
+                var spanText = op.TextSpan!.Text;
+                if (string.IsNullOrEmpty(spanText) || !newCombined.Contains(spanText)) continue;
+                var replacement = op.Strategy == RedactionStrategy.FullRedaction ? new string('█', spanText.Length) : op.ReplacementText ?? string.Empty;
+                newCombined = newCombined.Replace(spanText, replacement);
             }
+            if (newCombined == combined) continue;
+            textElements[0].Text = newCombined;
+            textElements[0].Space = SpaceProcessingModeValues.Preserve;
+            for (int i = 1; i < textElements.Count; i++) textElements[i].Text = string.Empty;
         }
     }
 
