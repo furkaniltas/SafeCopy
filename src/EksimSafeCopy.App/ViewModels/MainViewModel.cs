@@ -976,6 +976,24 @@ public sealed class MainViewModel : ViewModelBase
             }
 
             var verification = verifyResult.Value;
+            // Filter residual detections: deselected PII is allowed to remain, not counted as residual
+            var deselectedValues = Detections.Where(d => !d.IsSelected).Select(d => d.Detection.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (deselectedValues.Count > 0 && verification.ResidualDetections.Count > 0)
+            {
+                var filtered = verification.ResidualDetections.Where(r => !deselectedValues.Contains(r.Value)).ToList();
+                if (filtered.Count != verification.ResidualDetections.Count)
+                {
+                    verification = new VerificationResult
+                    {
+                        Passed = filtered.Count == 0 && verification.MetadataIssues.Count == 0 && verification.HiddenContentIssues.Count == 0,
+                        ResidualDetections = filtered,
+                        MetadataIssues = verification.MetadataIssues,
+                        HiddenContentIssues = verification.HiddenContentIssues,
+                        ScanDuration = verification.ScanDuration,
+                        VerifiedAt = verification.VerifiedAt
+                    };
+                }
+            }
             await RunOnUiAsync(() => VerificationResult = verification).ConfigureAwait(false);
 
             // Enforce 10 SUCCESS invariants before claiming success

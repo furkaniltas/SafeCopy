@@ -294,6 +294,43 @@ public class MainViewModelTests
         allowed.Should().Contain("TesisatNo");
     }
 
+    [Fact]
+    public async Task Redact_WithPartialSelection_Succeeds()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"app_test_{Guid.NewGuid():N}.txt");
+        File.WriteAllText(tmp, "Tesisat No : 12132133\nAD Soyad : Furkan İltaş\nTC: 10000000146\nTelefon: 05321234567\nAdres: Ankara");
+        string? outputPath = null;
+        try
+        {
+            var vm = CreateProvider().GetRequiredService<MainViewModel>();
+            await vm.LoadAndDetectAsync(tmp);
+            vm.SelectedFilePath = tmp;
+            vm.Detections.Should().HaveCountGreaterThan(1);
+            // Deselect one detection (e.g., second one)
+            var toDeselect = vm.Detections[1];
+            toDeselect.IsSelected = false;
+            vm.SelectedCount.Should().Be(vm.Detections.Count - 1);
+            await vm.RedactAsyncForTest();
+            vm.ProcessingState.Should().Be(ProcessingState.Success, $"Status: {vm.StatusMessage}");
+            vm.VerificationResult.Should().NotBeNull();
+            vm.VerificationResult!.Passed.Should().BeTrue();
+            outputPath = vm.OutputPath!;
+            File.Exists(outputPath).Should().BeTrue();
+            var outputText = File.ReadAllText(outputPath);
+            // Deselected value should remain
+            outputText.Should().Contain(toDeselect.Value);
+            // Selected values should be masked
+            var selected = vm.Detections.Where(d => d.IsSelected).ToList();
+            foreach (var s in selected)
+                outputText.Should().NotContain(s.Value);
+        }
+        finally
+        {
+            File.Delete(tmp);
+            if (outputPath != null && File.Exists(outputPath)) File.Delete(outputPath);
+        }
+    }
+
     private string ComputeHash(string path)
     {
         using var s = File.OpenRead(path);
