@@ -240,14 +240,25 @@
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1">
-                        <StackPanel>
-                            <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Row="0" Grid.Column="0">
+                                <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
+                                </StackPanel>
                             </StackPanel>
+                            <Button Grid.Row="0" Grid.Column="1" Content="Kuyruğu Temizle" Command="{Binding ClearBatchCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" FontSize="10" VerticalAlignment="Center" ToolTip="Toplu işlem kuyruğunu temizle"/>
                             <!-- Search box #16354D -->
-                            <Border Margin="0,8,0,0" Background="{StaticResource SearchBackground}" BorderBrush="{StaticResource BorderBlue}" BorderThickness="1" CornerRadius="4" Padding="8,5">
+                            <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Background="{StaticResource SearchBackground}" BorderBrush="{StaticResource BorderBlue}" BorderThickness="1" CornerRadius="4" Padding="8,5">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -269,7 +280,7 @@
                                     <TextBlock Grid.Column="1" Text="⌕" Foreground="{StaticResource PlaceholderBrush}" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                                 </Grid>
                             </Border>
-                        </StackPanel>
+                        </Grid>
                     </Border>
 
                     <ListView Grid.Row="1" ItemsSource="{Binding Detections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
