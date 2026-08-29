@@ -75,7 +75,7 @@ public sealed class DocumentSecurityValidator : IDocumentSecurityValidator
     {
         try
         {
-            using var stream = File.OpenRead(filePath);
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             return DetectFormatFromStream(stream);
         }
         catch
@@ -137,7 +137,7 @@ public sealed class DocumentSecurityValidator : IDocumentSecurityValidator
     {
         try
         {
-            using var stream = File.OpenRead(filePath);
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             return IdentifyZipBasedFormatFromStream(stream);
         }
         catch
@@ -179,7 +179,7 @@ public sealed class DocumentSecurityValidator : IDocumentSecurityValidator
     {
         try
         {
-            using var stream = File.OpenRead(filePath);
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             System.Security.Cryptography.HashAlgorithm hasher = algorithm switch
             {
                 CoreHashAlgorithm.SHA256 => SHA256.Create(),

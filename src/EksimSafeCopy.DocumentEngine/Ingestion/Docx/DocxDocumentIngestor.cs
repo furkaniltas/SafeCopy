@@ -24,7 +24,8 @@ public sealed class DocxDocumentIngestor : DocumentIngestorBase
     {
         try
         {
-            using var wordDocument = WordprocessingDocument.Open(filePath, false);
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var wordDocument = WordprocessingDocument.Open(stream, false);
             return ProcessDocxDocument(wordDocument, filePath, cancellationToken);
         }
         catch (OpenXmlPackageException ex)

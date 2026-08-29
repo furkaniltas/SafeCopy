@@ -22,7 +22,7 @@ public sealed class FileSystem : IFileSystem
         try
         {
             if (!File.Exists(path)) return Result<Stream>.Failure(Error.NotFound($"File not found: {path}"));
-            return Result<Stream>.Success(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read));
+            return Result<Stream>.Success(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
         }
         catch (Exception ex) { return Result<Stream>.Failure(Error.IoError(ex.Message, ex)); }
     }
@@ -63,7 +63,7 @@ public sealed class FileSystem : IFileSystem
         {
             if (!File.Exists(path)) return Result<string>.Failure(Error.NotFound($"File not found: {path}"));
             
-            using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var hasher = algorithm switch
             {
                 CoreHashAlgorithm.SHA256 => (System.Security.Cryptography.HashAlgorithm)System.Security.Cryptography.SHA256.Create(),
