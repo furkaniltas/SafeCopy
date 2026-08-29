@@ -15,6 +15,18 @@ public sealed class DocumentSecurityValidator : IDocumentSecurityValidator
     {
         if (string.IsNullOrWhiteSpace(filePath))
             return Result.Failure(Error.Validation("File path cannot be empty"));
+        // Support directory-based UDF (e.g., FFF.udf as folder with content.xml)
+        if (Directory.Exists(filePath))
+        {
+            if (filePath.EndsWith(".udf", StringComparison.OrdinalIgnoreCase))
+            {
+                var contentXml = Path.Combine(filePath, "content.xml");
+                var content = Path.Combine(filePath, "content");
+                if (File.Exists(contentXml) || File.Exists(content))
+                    return Result.Success();
+            }
+            return Result.Failure(Error.NotFound($"File not found: {filePath}"));
+        }
         if (!File.Exists(filePath))
             return Result.Failure(Error.NotFound($"File not found: {filePath}"));
         try

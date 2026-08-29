@@ -19,6 +19,35 @@ public sealed class UdfDocumentIngestor : DocumentIngestorBase
     {
         try
         {
+            // Support both ZIP file and directory-based UDF (e.g., FFF.udf as folder with content.xml)
+            if (Directory.Exists(filePath))
+            {
+                var contentPath = Path.Combine(filePath, "content.xml");
+                if (!File.Exists(contentPath))
+                    contentPath = Path.Combine(filePath, "content");
+                if (!File.Exists(contentPath))
+                    return Result<Document>.Failure(Error.FormatError("UDF directory missing content.xml"));
+                var contentXml = File.ReadAllText(contentPath, System.Text.Encoding.UTF8);
+                var doc = ParseContentXml(contentXml, filePath);
+                // Try to load images from directory
+                var images = ExtractImagesFromDirectory(filePath).ToList();
+                if (images.Count > 0)
+                {
+                    var pages = doc.Pages.ToList();
+                    if (pages.Count > 0)
+                    {
+                        var p = pages[0];
+                        pages[0] = new DocumentPage
+                        {
+                            PageNumber = p.PageNumber, Width = p.Width, Height = p.Height, DpiX = p.DpiX, DpiY = p.DpiY,
+                            Text = p.Text, TextBlocks = p.TextBlocks, Images = images, IsScanned = p.IsScanned
+                        };
+                        doc = doc.WithPages(pages);
+                    }
+                }
+                return Result<Document>.Success(doc);
+            }
+
             using var archive = ZipFile.OpenRead(filePath);
             return ProcessUdfArchive(archive, filePath, cancellationToken);
         }
@@ -235,5 +264,30 @@ public sealed class UdfDocumentIngestor : DocumentIngestorBase
                 }
             }
         }
+    }
+
+    private IEnumerable<ImageReference> ExtractImagesFromDirectory(string directoryPath)
+    {
+        var result = new List<ImageReference>();
+        foreach (var subDir in new[] { "binary", "images" })
+        {
+            var dir = Path.Combine(directoryPath, subDir);
+            if (!Directory.Exists(dir)) continue;
+            foreach (var file in Directory.GetFiles(dir))
+            {
+                try
+                {
+                    var bytes = File.ReadAllBytes(file);
+                    result.Add(new ImageReference
+                    {
+                        Format = Path.GetExtension(file).TrimStart('.'),
+                        Data = bytes,
+                        BoundingBox = BoundingBox.Empty
+                    });
+                }
+                catch { /* skip */ }
+            }
+        }
+        foreach (var item in result) yield return item;
     }
 }
