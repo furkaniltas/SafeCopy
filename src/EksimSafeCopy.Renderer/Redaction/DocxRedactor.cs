@@ -40,40 +40,144 @@ public sealed class DocxRedactor : IRedactor
                 .OrderByDescending(o => o.TextSpan!.Text.Length)
                 .ToList();
 
-            foreach (var paragraph in body.Descendants<Paragraph>())
+            // Cross-paragraph redaction: build paragraph list with offsets to handle spans like "DİYARBAKIR İCRA DAİRESİ" split as "DİYARBAKIR" | "İCRA DAİRESİ" across two w:p
+            var paragraphs = body.Descendants<Paragraph>().ToList();
+            var paraInfos = new System.Collections.Generic.List<(Paragraph para, string text, int start, System.Collections.Generic.List<Text> elems)>();
+            int docOffset = 0;
+            foreach (var p in paragraphs)
             {
-                // Use paragraph-level text to handle split runs (e.g., "Ahmet " + "Yılmaz" across two w:t)
-                var paraText = paragraph.InnerText;
-                var needsRedaction = sortedOps.Any(op => !string.IsNullOrEmpty(op.TextSpan!.Text) && paraText.Contains(op.TextSpan!.Text));
-                if (!needsRedaction) continue;
+                var elems = p.Descendants<Text>().ToList();
+                var txt = string.Concat(elems.Select(t => t.Text));
+                // Fallback to InnerText if no Text elements (e.g., empty para)
+                if (elems.Count == 0) txt = p.InnerText;
+                paraInfos.Add((p, txt, docOffset, elems));
+                docOffset += txt.Length + 1; // +1 for paragraph separator "\n" as in DocumentEngine
+            }
+            var fullDocText = string.Join("\n", paraInfos.Select(pi => pi.text));
 
-                // Collect all Text elements in this paragraph (including those inside Hyperlink/SmartTag)
-                var textElements = paragraph.Descendants<Text>().ToList();
-                if (textElements.Count == 0) continue;
+            foreach (var op in sortedOps)
+            {
+                var spanText = op.TextSpan!.Text;
+                if (string.IsNullOrEmpty(spanText) || op.TextSpan == null) continue;
 
-                // Build combined text and perform replacements
-                var combined = string.Concat(textElements.Select(t => t.Text));
-                var newCombined = combined;
-                foreach (var op in sortedOps)
+                // First try single-paragraph exact match (fast path for non-cross-paragraph spans like "SABRİ GÖÇLÜ")
+                bool handled = false;
+                for (int pi = 0; pi < paraInfos.Count; pi++)
                 {
-                    var spanText = op.TextSpan!.Text;
-                    if (string.IsNullOrEmpty(spanText)) continue;
-                    if (!newCombined.Contains(spanText)) continue;
+                    var (para2, text2, start2, elems2) = paraInfos[pi];
+                    if (!text2.Contains(spanText, StringComparison.Ordinal) && !string.Concat(elems2.Select(t => t.Text)).Contains(spanText, StringComparison.Ordinal)) continue;
+                    var combined2 = string.Concat(elems2.Select(t => t.Text));
+                    if (!combined2.Contains(spanText, StringComparison.Ordinal)) continue;
+                    var replacement2 = op.Strategy == RedactionStrategy.FullRedaction ? new string('█', spanText.Length) : op.ReplacementText ?? string.Empty;
+                    var newCombined2 = combined2.Replace(spanText, replacement2);
+                    if (newCombined2 == combined2) continue;
+                    elems2[0].Text = newCombined2;
+                    elems2[0].Space = SpaceProcessingModeValues.Preserve;
+                    for (int i = 1; i < elems2.Count; i++) elems2[i].Text = string.Empty;
+                    paraInfos[pi] = (para2, newCombined2, start2, elems2);
+                    handled = true;
+                }
+                if (handled)
+                {
+                    // Recompute offsets after single-para handling
+                    int newOff = paraInfos[0].start;
+                    for (int j = 0; j < paraInfos.Count; j++)
+                    {
+                        var (p2, t2, _, e2) = paraInfos[j];
+                        paraInfos[j] = (p2, t2, newOff, e2);
+                        newOff += t2.Length + 1;
+                    }
+                    fullDocText = string.Join("\n", paraInfos.Select(pi => pi.text));
+                    continue;
+                }
+
+                // Cross-paragraph: use offsets with normalized whitespace handling
+                int spanStart = op.TextSpan.StartIndex;
+                int spanLen = op.TextSpan.Length;
+                var normalizedFull = System.Text.RegularExpressions.Regex.Replace(fullDocText, @"\s+", " ");
+                var normalizedSpan = System.Text.RegularExpressions.Regex.Replace(spanText, @"\s+", " ");
+                if (spanStart < 0 || spanStart + spanLen > fullDocText.Length || (spanLen <= fullDocText.Length - spanStart && fullDocText.Substring(spanStart, Math.Min(spanLen, fullDocText.Length - spanStart)) != spanText))
+                {
+                    spanStart = normalizedFull.IndexOf(normalizedSpan, StringComparison.Ordinal);
+                    if (spanStart < 0) continue;
+                    spanLen = normalizedSpan.Length;
+                }
+
+                int spanEnd = spanStart + spanLen;
+                // Find paragraphs that overlap this span
+                for (int pi = 0; pi < paraInfos.Count; pi++)
+                {
+                    var (para, text, start, elems) = paraInfos[pi];
+                    int paraEnd = start + text.Length;
+                    // Check overlap: span [spanStart, spanEnd) with para [start, paraEnd)
+                    if (spanEnd <= start || spanStart >= paraEnd) continue;
+                    // Overlap region within this paragraph
+                    int overlapStartInPara = Math.Max(spanStart, start) - start;
+                    int overlapEndInPara = Math.Min(spanEnd, paraEnd) - start;
+                    int overlapLen = overlapEndInPara - overlapStartInPara;
+                    if (overlapLen <= 0) continue;
+                    // Handle newline char at paragraph boundary (start+text.Length == span position of \n)
+                    if (overlapStartInPara >= text.Length) continue;
+
+                    var overlapText = text.Substring(overlapStartInPara, Math.Min(overlapLen, text.Length - overlapStartInPara));
+                    // If span includes newline, skip that char for this para
+                    if (overlapText == "\n") continue;
+
+                    if (elems.Count == 0) continue;
+                    var combined = string.Concat(elems.Select(t => t.Text));
                     var replacement = op.Strategy == RedactionStrategy.FullRedaction
-                        ? new string('█', spanText.Length)
+                        ? new string('█', overlapText.Length)
                         : op.ReplacementText ?? string.Empty;
-                    newCombined = newCombined.Replace(spanText, replacement);
-                }
-                if (newCombined == combined) continue;
+                    // If whole paragraph text equals overlap, replace directly
+                    // Otherwise replace substring within combined
+                    string newCombined;
+                    if (combined.Contains(overlapText))
+                        newCombined = combined.Replace(overlapText, replacement);
+                    else
+                        newCombined = combined; // fallback
 
-                // Distribute newCombined back to Text elements - simplest: first Text gets all, rest cleared
-                // Preserves at least the redacted content; formatting of split runs is secondary to security
-                textElements[0].Text = newCombined;
-                textElements[0].Space = SpaceProcessingModeValues.Preserve;
-                for (int i = 1; i < textElements.Count; i++)
-                {
-                    textElements[i].Text = string.Empty;
+                    if (newCombined == combined) continue;
+                    elems[0].Text = newCombined;
+                    elems[0].Space = SpaceProcessingModeValues.Preserve;
+                    for (int i = 1; i < elems.Count; i++) elems[i].Text = string.Empty;
+                    // Update paraInfos text and recompute offsets for subsequent ops
+                    paraInfos[pi] = (para, newCombined, start, elems);
+                    // Recompute start offsets for all paras after this one due to length change
+                    int newOffset = paraInfos[0].start;
+                    for (int j = 0; j < paraInfos.Count; j++)
+                    {
+                        var (p2, t2, _, e2) = paraInfos[j];
+                        paraInfos[j] = (p2, t2, newOffset, e2);
+                        newOffset += t2.Length + 1;
+                    }
                 }
+                // For cross-paragraph spans like "NE ESAS TALEP EVRAKI" that may have been split across paras with extra whitespace/empty paras,
+                // also do word-level fallback for any remaining words that are still present
+                var remainingWords = normalizedSpan.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var currentFullForWordCheck = string.Join("\n", paraInfos.Select(pi => pi.text));
+                var normalizedCurrent = System.Text.RegularExpressions.Regex.Replace(currentFullForWordCheck, @"\s+", " ");
+                foreach (var word in remainingWords)
+                {
+                    if (!normalizedCurrent.Contains(word, StringComparison.OrdinalIgnoreCase)) continue;
+                    for (int pi2 = 0; pi2 < paraInfos.Count; pi2++)
+                    {
+                        var (p2, txt2, s2, elems2) = paraInfos[pi2];
+                        var comb2 = elems2.Count > 0 ? string.Concat(elems2.Select(t => t.Text)) : txt2;
+                        if (comb2.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        var rep2 = op.Strategy == RedactionStrategy.FullRedaction ? new string('█', word.Length) : op.ReplacementText ?? string.Empty;
+                        var newComb2 = System.Text.RegularExpressions.Regex.Replace(comb2, System.Text.RegularExpressions.Regex.Escape(word), rep2, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (newComb2 == comb2) continue;
+                        if (elems2.Count == 0) continue;
+                        elems2[0].Text = newComb2;
+                        elems2[0].Space = SpaceProcessingModeValues.Preserve;
+                        for (int i = 1; i < elems2.Count; i++) elems2[i].Text = string.Empty;
+                        paraInfos[pi2] = (p2, newComb2, s2, elems2);
+                    }
+                    currentFullForWordCheck = string.Join("\n", paraInfos.Select(pi => pi.text));
+                    normalizedCurrent = System.Text.RegularExpressions.Regex.Replace(currentFullForWordCheck, @"\s+", " ");
+                }
+                // Update fullDocText for next ops (avoid double-redacting same region with different length)
+                fullDocText = string.Join("\n", paraInfos.Select(pi => pi.text));
             }
 
             // Also process headers and footers
