@@ -20,4 +20,8 @@
     <ProjectReference Include="..\EksimSafeCopy.Renderer\EksimSafeCopy.Renderer.csproj" />
     <ProjectReference Include="..\EksimSafeCopy.Infrastructure\EksimSafeCopy.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\test.jsonl" />
+  </ItemGroup>
 </Project>
