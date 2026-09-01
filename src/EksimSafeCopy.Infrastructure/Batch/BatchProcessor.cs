@@ -615,7 +615,7 @@ void Report(BatchItemState state, string message, Error? err = null, string? out
             // 10. IVerificationEngine.Verify on output
             BatchDiagLog.Write($"ProcessSingleFileAsync: Starting verification on {outputPath}");
             Report(BatchItemState.Processing, "Doğrulama yapılıyor...", outPath: outputPath, dets: detections);
-            var verifyResult = await Task.Run(() => _verificationEngine.Verify(outputPath, detectedFormat, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var verifyResult = await Task.Run(() => _verificationEngine.Verify(outputPath, detectedFormat, detections, options, cancellationToken), cancellationToken).ConfigureAwait(false);
             BatchDiagLog.Write($"ProcessSingleFileAsync: Verification returned IsSuccess={verifyResult.IsSuccess}, Passed={verifyResult.Value?.Passed}, Residual={verifyResult.Value?.TotalResidualCount}");
             if (verifyResult.IsFailure)
             {

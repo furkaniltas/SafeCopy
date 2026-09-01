@@ -958,7 +958,7 @@ public sealed class MainViewModel : ViewModelBase
             StatusMessage = "Doğrulama yapılıyor (çıktı tekrar taranıyor)...";
 
             var verifyFormatResult = CurrentDocument.Format;
-            var verifyResult = await Task.Run(() => _verificationEngine.Verify(outputPath, verifyFormatResult, token), token).ConfigureAwait(false);
+            var verifyResult = await Task.Run(() => _verificationEngine.Verify(outputPath, verifyFormatResult, selectedDetections, options, token), token).ConfigureAwait(false);
 
             if (token.IsCancellationRequested)
             {

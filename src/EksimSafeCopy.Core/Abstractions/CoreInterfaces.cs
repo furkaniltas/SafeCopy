@@ -69,6 +69,10 @@ public interface IVerificationEngine
     
     Result<VerificationResult> Verify(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default);
     Task<Result<VerificationResult>> VerifyAsync(Stream stream, DocumentFormat format, CancellationToken cancellationToken = default);
+
+    // Partial masking aware verification
+    Result<VerificationResult> Verify(string filePath, DocumentFormat format, IReadOnlyList<Detection> originalDetections, RenderOptions options, CancellationToken cancellationToken = default) => Verify(filePath, format, cancellationToken);
+    Task<Result<VerificationResult>> VerifyAsync(string filePath, DocumentFormat format, IReadOnlyList<Detection> originalDetections, RenderOptions options, CancellationToken cancellationToken = default) => VerifyAsync(filePath, format, cancellationToken);
 }
 
 public sealed class RedactionOperation
@@ -120,6 +124,7 @@ public interface IRedactionStrategy
 {
     RedactionStrategy Type { get; }
     string GetReplacementText(DetectionType type, RenderOptions options);
+    string GetReplacementText(DetectionType type, string originalValue, RenderOptions options) => GetReplacementText(type, options);
     bool SupportsFormat(DocumentFormat format);
 }
 

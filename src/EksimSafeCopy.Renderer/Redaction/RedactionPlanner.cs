@@ -6,10 +6,29 @@ using EksimSafeCopy.Core.Models;
 public sealed class RedactionPlanner : IRedactionPlanner
 {
     private readonly IRedactionStrategy _strategy;
+    private readonly IEnumerable<IRedactionStrategy> _allStrategies;
 
-    public RedactionPlanner(IRedactionStrategy strategy)
+    public RedactionPlanner(IRedactionStrategy strategy, IEnumerable<IRedactionStrategy>? allStrategies = null)
     {
         _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+        _allStrategies = allStrategies ?? Array.Empty<IRedactionStrategy>();
+    }
+
+    private IRedactionStrategy ResolveStrategy(RenderOptions options)
+    {
+        // For FullRedaction with UseTypePlaceholder, use TypeLabel to get "[TC_KIMLIK_NO]" style placeholders
+        // This preserves existing test expectations where new RenderOptions() should produce placeholders, not block chars
+        if (options.Mode == MaskingMode.FullRedaction && options.UseTypePlaceholder)
+            return _allStrategies.FirstOrDefault(s => s.Type == RedactionStrategy.TypeLabel) ?? _strategy;
+        var desired = options.Mode switch
+        {
+            MaskingMode.FullRedaction => RedactionStrategy.FullRedaction,
+            MaskingMode.PartialMask => RedactionStrategy.PartialMask,
+            MaskingMode.Placeholder => RedactionStrategy.Placeholder,
+            _ => _strategy.Type
+        };
+        var found = _allStrategies.FirstOrDefault(s => s.Type == desired);
+        return found ?? _strategy;
     }
 
     public Result<RedactionPlan> CreatePlan(Document document, IReadOnlyList<Detection> detections, RenderOptions options, CancellationToken cancellationToken = default)
@@ -28,8 +47,8 @@ public sealed class RedactionPlanner : IRedactionPlanner
                 if (detection.Confidence < options.ConfidenceThreshold)
                     continue;
 
-                var strategy = _strategy;
-                var replacementText = strategy.GetReplacementText(detection.Type, options);
+                var strategy = ResolveStrategy(options);
+                var replacementText = strategy.GetReplacementText(detection.Type, detection.Value ?? string.Empty, options);
 
                 var operation = new RedactionOperation
                 {
@@ -39,7 +58,7 @@ public sealed class RedactionPlanner : IRedactionPlanner
                     TextSpan = detection.TextSpan,
                     BoundingBox = detection.Location,
                     CoordinateSystem = detection.Source?.Format != null ? null : null,
-                    Strategy = _strategy.Type,
+                    Strategy = strategy.Type,
                     ReplacementText = replacementText,
                     Confidence = detection.Confidence,
                     State = RedactionOperationState.Pending

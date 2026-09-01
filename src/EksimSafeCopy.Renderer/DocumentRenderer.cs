@@ -142,7 +142,9 @@ public static class RendererModule
         services.AddSingleton<IRedactionStrategy, Redaction.PartialMaskStrategy>();
 
         // Redaction planner
-        services.AddSingleton<IRedactionPlanner, Redaction.RedactionPlanner>();
+        services.AddSingleton<IRedactionPlanner>(sp => new RedactionPlanner(
+            sp.GetServices<IRedactionStrategy>().First(s => s.Type == RedactionStrategy.TypeLabel),
+            sp.GetServices<IRedactionStrategy>()));
 
         // Format-specific redactors
         services.AddSingleton<IRedactor, Redaction.TxtRedactor>();

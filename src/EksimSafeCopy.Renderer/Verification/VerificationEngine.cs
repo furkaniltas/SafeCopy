@@ -25,6 +25,11 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
 
     public Result<VerificationResult> Verify(string filePath, DocumentFormat format, CancellationToken cancellationToken = default)
     {
+        return Verify(filePath, format, Array.Empty<Detection>(), new RenderOptions(), cancellationToken);
+    }
+
+    public Result<VerificationResult> Verify(string filePath, DocumentFormat format, IReadOnlyList<Detection> originalDetections, RenderOptions options, CancellationToken cancellationToken = default)
+    {
         try
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -49,18 +54,77 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
                 return Result<VerificationResult>.Failure(detectResult.Error);
 
             var detections = detectResult.Value;
-            var residualDetections = detections
-                .Where(d => d.State != DetectionState.FalsePositive && d.State != DetectionState.Deselected)
-                .Select(d => new ResidualDetection
+            var isPartial = options.Mode == MaskingMode.PartialMask;
+            List<ResidualDetection> residualDetections;
+            if (isPartial && originalDetections.Count > 0)
+            {
+                // Policy-aware partial verification: original full values must not be present, only allowed visible parts
+                var originalByType = originalDetections.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.Select(d => d.Value).ToHashSet(StringComparer.OrdinalIgnoreCase));
+                residualDetections = new List<ResidualDetection>();
+                foreach (var d in detections.Where(d => d.State != DetectionState.FalsePositive && d.State != DetectionState.Deselected))
                 {
-                    Type = d.Type,
-                    Value = d.Value,
-                    Context = d.Context,
-                    Confidence = d.Confidence,
-                    Location = d.Location,
-                    PageNumber = d.PageNumber
-                })
-                .ToList();
+                    // If this detection's value was originally selected for partial masking, check if its visible part is allowed
+                    bool wasOriginalPartial = originalDetections.Any(o => string.Equals(o.Value, d.Value, StringComparison.OrdinalIgnoreCase));
+                    if (wasOriginalPartial)
+                    {
+                        // This exact original value should have been masked - if still found, it's a failure
+                        residualDetections.Add(new ResidualDetection { Type = d.Type, Value = d.Value, Context = d.Context, Confidence = d.Confidence, Location = d.Location, PageNumber = d.PageNumber });
+                        continue;
+                    }
+                    // For partial, the full original should not be found, but a substring (like last 4 of TC) might be found as new detection
+                    foreach (var orig in originalDetections)
+                    {
+                        var expectedMasked = EksimSafeCopy.Renderer.Redaction.PartialMaskingPolicy.Mask(orig.Type, orig.Value);
+                        // If the detected value is exactly the expected masked suffix/prefix, it's allowed
+                        if (expectedMasked.Contains(d.Value) && !string.Equals(expectedMasked, d.Value, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // The detected value is a substring of the masked version - check if it's the allowed visible part
+                            // For TC *******8901, the visible part is 8901, but detector would need 11 digits to detect TC, so 8901 alone shouldn't be detected as TC
+                            // So any detection of original type after partial masking indicates the masking was insufficient
+                            continue;
+                        }
+                        // If the detected value equals the original full value, it's definitely residual
+                        if (string.Equals(orig.Value, d.Value, StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                    // If not a direct original, check if it's a new PII that was not in original - still residual
+                    // For partial, we allow that the output may contain the masked version, but not the original
+                    // So only add if it's not an allowed partial fragment
+                    var isOriginalFullValueStillPresent = originalDetections.Any(o => string.Equals(o.Value, d.Value, StringComparison.OrdinalIgnoreCase));
+                    if (isOriginalFullValueStillPresent)
+                        residualDetections.Add(new ResidualDetection { Type = d.Type, Value = d.Value, Context = d.Context, Confidence = d.Confidence, Location = d.Location, PageNumber = d.PageNumber });
+                    else
+                    {
+                        // Check if the detected value contains any original's sensitive part that should have been hidden
+                        bool containsSensitivePart = originalDetections.Any(o =>
+                        {
+                            var masked = EksimSafeCopy.Renderer.Redaction.PartialMaskingPolicy.Mask(o.Type, o.Value);
+                            // The part that should be hidden is original without the visible suffix/prefix
+                            var sensitivePart = GetSensitivePart(o.Type, o.Value, masked);
+                            return !string.IsNullOrEmpty(sensitivePart) && d.Value.Contains(sensitivePart, StringComparison.OrdinalIgnoreCase);
+                        });
+                        if (containsSensitivePart)
+                            residualDetections.Add(new ResidualDetection { Type = d.Type, Value = d.Value, Context = d.Context, Confidence = d.Confidence, Location = d.Location, PageNumber = d.PageNumber });
+                    }
+                }
+            }
+            else
+            {
+                residualDetections = detections
+                    .Where(d => d.State != DetectionState.FalsePositive && d.State != DetectionState.Deselected)
+                    .Select(d => new ResidualDetection
+                    {
+                        Type = d.Type,
+                        Value = d.Value,
+                        Context = d.Context,
+                        Confidence = d.Confidence,
+                        Location = d.Location,
+                        PageNumber = d.PageNumber
+                    })
+                    .ToList();
+            }
 
             var metadataIssues = CheckMetadata(document);
             var hiddenContentIssues = CheckHiddenContent(document);
@@ -87,6 +151,19 @@ public sealed class VerificationEngine : EksimSafeCopy.Core.Abstractions.IVerifi
         {
             return Result<VerificationResult>.Failure(Error.Internal($"Verification failed: {ex.Message}", ex));
         }
+    }
+
+    private static string GetSensitivePart(DetectionType type, string original, string masked)
+    {
+        // Return the part that should have been hidden (masked with *)
+        var digits = new string(original.Where(char.IsDigit).ToArray());
+        var maskedDigits = new string(masked.Where(char.IsDigit).ToArray());
+        // For TC, sensitive is first 7 digits
+        if (type == DetectionType.TcKimlikNo && digits.Length == 11)
+            return digits.Substring(0, 7);
+        if ((type == DetectionType.TesisatNo || type == DetectionType.AboneNo || type == DetectionType.SayacNo) && digits.Length >= 6)
+            return digits.Substring(0, digits.Length - 4);
+        return string.Empty;
     }
 
     public async Task<Result<VerificationResult>> VerifyAsync(string filePath, DocumentFormat format, CancellationToken cancellationToken = default)
