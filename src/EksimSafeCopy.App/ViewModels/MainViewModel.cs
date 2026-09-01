@@ -269,6 +269,15 @@ public sealed class MainViewModel : ViewModelBase
 
     public int SelectedCount => Detections.Count(d => d.IsSelected);
 
+    private MaskingMode _selectedMaskingMode = MaskingMode.FullRedaction;
+    public MaskingMode SelectedMaskingMode
+    {
+        get => _selectedMaskingMode;
+        set => SetProperty(ref _selectedMaskingMode, value);
+    }
+
+    public Array AvailableMaskingModes => Enum.GetValues(typeof(MaskingMode));
+
     public ICommand OpenFileCommand { get; }
     public ICommand DetectCommand { get; }
     public ICommand RedactCommand { get; }
@@ -373,8 +382,8 @@ public sealed class MainViewModel : ViewModelBase
             InputPaths = toProcess,
             Options = new RenderOptions
             {
-                Mode = MaskingMode.FullRedaction,
-                UseTypePlaceholder = true,
+                Mode = SelectedMaskingMode,
+                UseTypePlaceholder = SelectedMaskingMode == MaskingMode.FullRedaction,
                 SanitizeMetadata = true,
                 RemoveHiddenContent = true
             },
@@ -883,8 +892,8 @@ public sealed class MainViewModel : ViewModelBase
 
             var options = new RenderOptions
             {
-                Mode = MaskingMode.FullRedaction,
-                UseTypePlaceholder = true,
+                Mode = SelectedMaskingMode,
+                UseTypePlaceholder = SelectedMaskingMode == MaskingMode.FullRedaction,
                 SanitizeMetadata = true,
                 RemoveHiddenContent = true
             };

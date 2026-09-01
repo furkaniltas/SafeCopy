@@ -80,3 +80,37 @@ public sealed class BoolToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+public sealed class MaskingModeConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is MaskingMode mode)
+        {
+            return mode switch
+            {
+                MaskingMode.FullRedaction => "Tam Maskeleme",
+                MaskingMode.PartialMask => "Kısmi Maskeleme",
+                MaskingMode.Placeholder => "Yer Tutucu",
+                MaskingMode.Custom => "Özel",
+                _ => mode.ToString()
+            };
+        }
+        return value?.ToString() ?? string.Empty;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is string s)
+        {
+            return s switch
+            {
+                "Tam Maskeleme" => MaskingMode.FullRedaction,
+                "Kısmi Maskeleme" => MaskingMode.PartialMask,
+                _ => MaskingMode.FullRedaction
+            };
+        }
+        if (value is MaskingMode m) return m;
+        return MaskingMode.FullRedaction;
+    }
+}

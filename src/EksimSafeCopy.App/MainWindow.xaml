@@ -335,6 +335,20 @@
 
                     <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12,10" Background="#F8FAFC">
                         <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Maskeleme:" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableMaskingModes}" SelectedItem="{Binding SelectedMaskingMode, Mode=TwoWay}" Width="130" FontSize="11" ToolTip="Tam: tüm PII [REDACTED], Kısmi: son 4 hane görünür">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource MaskingModeConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
                             <Button Content="Güvenli Kopya Oluştur" Command="{Binding RedactCommand}" Style="{StaticResource PrimaryButtonStyle}" Height="38" FontSize="13" FontWeight="SemiBold" ToolTip="Seçili PII'leri maskeleyerek güvenli kopya oluştur (orijinal değişmez)"/>
                             <TextBlock Text="Orijinal dosya asla değiştirilmez. Çıktı ayrı dosya olarak oluşturulur." FontSize="9" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                             <TextBlock Text="{Binding OriginalHash, StringFormat='SHA256: {0}'}" FontSize="8" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding OriginalHash}"/>
