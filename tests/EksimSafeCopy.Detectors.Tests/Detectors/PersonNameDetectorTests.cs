@@ -184,4 +184,40 @@ public class PersonNameDetectorTests
         detections.Should().HaveCount(2);
         detections.Select(d => d.Value).Should().Contain("Ahmet Yılmaz", "Ayşe Demir");
     }
+
+    [Fact]
+    public void Detect_InstitutionName_DiyarbakirIcraDairesi_NotDetected()
+    {
+        var document = CreateDocument("DİYARBAKIR İCRA DAİRESİ");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "DİYARBAKIR İCRA DAİRESİ");
+    }
+
+    [Fact]
+    public void Detect_LegalDocumentHeader_NeEsasTalepEvraki_NotDetected()
+    {
+        var document = CreateDocument("NE ESAS TALEP EVRAKI");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "NE ESAS TALEP EVRAKI");
+    }
+
+    [Fact]
+    public void Detect_LegalPhrase_TakibinKesinlestirilmesini_NotDetected()
+    {
+        var document = CreateDocument("Takibin Kesinleştirilmesini");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "Takibin Kesinleştirilmesini");
+    }
+
+    [Fact]
+    public void Detect_RealPersonName_SabriGoclu_Detected()
+    {
+        var document = CreateDocument("SABRİ GÖÇLÜ");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "SABRİ GÖÇLÜ");
+    }
 }

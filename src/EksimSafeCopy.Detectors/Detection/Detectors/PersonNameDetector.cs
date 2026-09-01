@@ -20,7 +20,7 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         @"\b[A-ZÇĞİÖŞÜ]{2,}(?:\s+[A-ZÇĞİÖŞÜ]{2,}){1,3}\b",
         RegexOptions.Compiled);
 
-    private static readonly HashSet<string> TurkishCities = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> TurkishCities = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
         "adana", "adıyaman", "afyonkarahisar", "ağrı", "aksaray", "amasya", "ankara", "antalya", "ardahan", "artvin",
         "aydın", "balıkesir", "bartın", "batman", "bayburt", "bilecik", "bingöl", "bitlis", "bolu", "burdur",
@@ -33,7 +33,7 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "yozgat", "zonguldak"
     };
 
-    private static readonly HashSet<string> NegativeKeywords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> NegativeKeywords = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
         "şirket", "firma", "kurum", "kuruluş", "müdürlük", "birim", "bölge", "bölüm",
         "departman", "üniversite", "okul", "hastane", "belediye", "valilik",
@@ -41,10 +41,12 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "internet", "telekom", "dağıtım", "tedarik", "hizmet", "destek",
         "anonym", "anonim", "misafir", "müşteri", "müşteriler", "üye", "üyeler",
         "tesisat", "numarası", "numarasi", "sayaç", "sayac", "abone", "tesisat",
-        "ad", "soyad", "telefon", "adres", "tc", "numara"
+        "ad", "soyad", "telefon", "adres", "tc", "numara",
+        "icra", "dairesi", "dairesine", "daire", "esas", "talep", "evrakı", "evraki", "evrak",
+        "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin"
     };
 
-    private static readonly HashSet<string> TurkishTitles = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> TurkishTitles = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
         "temsilci", "müdür", "müdürü", "mudur", "muduru", "şef", "sefi", "sef",
         "uzman", "danışman", "danisman", "avukat", "avukatı", "avukati",
@@ -153,22 +155,20 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         foreach (var word in words)
         {
             if (word.Length < 2) return false;
-            if (TurkishCities.Contains(word.ToLowerInvariant())) return false;
-            if (NegativeKeywords.Contains(word.ToLowerInvariant())) return false;
+            if (TurkishCities.Contains(word)) return false;
+            if (NegativeKeywords.Contains(word)) return false;
         }
 
-        var lowerCandidate = candidate.ToLowerInvariant();
-        
         // Allow Turkish titles ONLY at the end of the name (e.g., "Ahmet Yılmaz Temsilci")
         // Reject if a title appears in the middle of the name
         for (int i = 0; i < words.Length - 1; i++)
         {
-            if (TurkishTitles.Contains(words[i].ToLowerInvariant()))
+            if (TurkishTitles.Contains(words[i]))
                 return false;
         }
         
-        // Reject if negative keywords appear anywhere
-        if (NegativeKeywords.Any(k => lowerCandidate.Contains(k.ToLowerInvariant()))) return false;
+        // Reject if negative keywords appear anywhere (covers kurum/hukuk phrases)
+        if (NegativeKeywords.Any(k => candidate.Contains(k, StringComparison.OrdinalIgnoreCase))) return false;
 
         return true;
     }
@@ -190,7 +190,13 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
             confidence = Math.Min(1.0, confidence + 0.05);
 
         if (name.All(char.IsUpper))
-            confidence = Math.Max(0.5, confidence - 0.1);
+        {
+            // Strong penalty for 3-4 word ALL-CAPS (kurum/belge başlıkları), but keep real 2-word names like "AHMET YILMAZ"
+            if (words.Length >= 3)
+                confidence = Math.Max(0.05, confidence - 0.35);
+            else
+                confidence = Math.Max(0.5, confidence - 0.1);
+        }
 
         return confidence;
     }
