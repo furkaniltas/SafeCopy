@@ -269,6 +269,13 @@ public sealed class MainViewModel : ViewModelBase
 
     public int SelectedCount => Detections.Count(d => d.IsSelected);
 
+    public IEnumerable<DetectionItemViewModel> PossibleDetections => Detections.Where(d => d.Type == DetectionType.PossiblePersonalData);
+    public bool HasPossibleDetections => PossibleDetections.Any();
+    public int PossibleCount => PossibleDetections.Count();
+    public IEnumerable<DetectionItemViewModel> DefiniteDetections => Detections.Where(d => d.Type != DetectionType.PossiblePersonalData);
+    public bool HasDefiniteDetections => DefiniteDetections.Any();
+    public int DefiniteCount => DefiniteDetections.Count();
+
     private MaskingMode _selectedMaskingMode = MaskingMode.FullRedaction;
     public MaskingMode SelectedMaskingMode
     {
@@ -769,7 +776,8 @@ public sealed class MainViewModel : ViewModelBase
                 Detections.Clear();
                 foreach (var d in detections)
                 {
-                    var vm = new DetectionItemViewModel(d, isSelected: true);
+                    var isSelected = d.Type != DetectionType.PossiblePersonalData;
+                    var vm = new DetectionItemViewModel(d, isSelected: isSelected);
                     vm.PropertyChanged += (s, e) =>
                     {
                         if (e.PropertyName == nameof(DetectionItemViewModel.IsSelected))
@@ -783,6 +791,8 @@ public sealed class MainViewModel : ViewModelBase
                 }
                 OnPropertyChanged(nameof(HasDetections));
                 OnPropertyChanged(nameof(SelectedCount));
+                OnPropertyChanged(nameof(HasPossibleDetections));
+                OnPropertyChanged(nameof(PossibleCount));
                 OnPropertyChanged(nameof(CanRedact));
                 System.Windows.Input.CommandManager.InvalidateRequerySuggested();
             }).ConfigureAwait(false);
@@ -1221,6 +1231,8 @@ public sealed class MainViewModel : ViewModelBase
         StatusMessage = "Yeni tarama için dosya seçin.";
         OnPropertyChanged(nameof(HasDetections));
         OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(HasPossibleDetections));
+        OnPropertyChanged(nameof(PossibleCount));
         OnPropertyChanged(nameof(CanRedact));
     }
 

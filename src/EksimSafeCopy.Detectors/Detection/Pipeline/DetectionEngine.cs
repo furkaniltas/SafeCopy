@@ -3,10 +3,12 @@ namespace EksimSafeCopy.Detectors.Detection.Pipeline;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.Detectors.Detection.Detectors;
+using EksimSafeCopy.Detectors.Detection.PossiblePersonalData;
 
 public sealed class DetectionEngine : IDetectionEngine
 {
     private readonly IReadOnlyList<IDetector> _detectors;
+    private readonly IPossiblePersonalDataAnalyzer? _possibleAnalyzer;
 
     private static readonly HashSet<string> TurkishTitles = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -39,13 +41,14 @@ public sealed class DetectionEngine : IDetectionEngine
         "anonym", "anonim", "misafir", "müşteri", "müşteriler", "üye", "üyeler"
     };
 
-    public DetectionEngine(IEnumerable<IDetector> detectors)
+    public DetectionEngine(IEnumerable<IDetector> detectors, IPossiblePersonalDataAnalyzer? possibleAnalyzer = null)
     {
         _detectors = detectors
             .Where(d => d.IsEnabled)
             .OrderBy(d => d.Type)
             .ToList()
             .AsReadOnly();
+        _possibleAnalyzer = possibleAnalyzer;
     }
 
     public Result<IReadOnlyList<Detection>> Detect(Document document, CancellationToken cancellationToken = default)
@@ -69,6 +72,40 @@ public sealed class DetectionEngine : IDetectionEngine
 
             var processedDetections = PostProcessDetections(allDetections, document);
             
+            // PossiblePersonalData analyzer (after kesin detections, no duplicate)
+            if (_possibleAnalyzer != null)
+            {
+                var possibleDetections = new List<Detection>();
+                foreach (var page in document.Pages)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var pageText = page.Text;
+                    if (string.IsNullOrWhiteSpace(pageText)) continue;
+                    var normalized = EksimSafeCopy.Detectors.Detection.Normalization.TextNormalizer.NormalizeWithPositionTracking(pageText, new EksimSafeCopy.Detectors.Detection.Normalization.NormalizationOptions
+                    {
+                        NormalizeNewlines = true,
+                        CollapseWhitespace = true,
+                        CollapseNewlines = true,
+                        FixTurkishWhitespace = true,
+                        TrimEdges = true
+                    });
+                    var pageExisting = processedDetections.Where(d => d.PageNumber == page.PageNumber).ToList();
+                    var possible = _possibleAnalyzer.Analyze(document, normalized, pageExisting, cancellationToken);
+                    foreach (var p in possible)
+                    {
+                        if (p.TextSpan == null) continue;
+                        if (pageExisting.Any(e => e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!))) continue;
+                        if (possibleDetections.Any(e => e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!))) continue;
+                        possibleDetections.Add(p);
+                    }
+                }
+                if (possibleDetections.Count > 0)
+                {
+                    var combined = processedDetections.Concat(possibleDetections).ToList();
+                    processedDetections = PostProcessDetections(combined, document);
+                }
+            }
+
             return Result<IReadOnlyList<Detection>>.Success(processedDetections);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

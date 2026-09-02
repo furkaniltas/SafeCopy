@@ -621,6 +621,7 @@ public enum DetectionType
     CreditCard,
     IpAddress,
     Url,
+    PossiblePersonalData,
     Custom
 }
 

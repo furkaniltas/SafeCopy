@@ -3,6 +3,7 @@ namespace EksimSafeCopy.Detectors;
 using EksimSafeCopy.Core.Abstractions;
 using EksimSafeCopy.Detectors.Detection.Detectors;
 using EksimSafeCopy.Detectors.Detection.Pipeline;
+using EksimSafeCopy.Detectors.Detection.PossiblePersonalData;
 using Microsoft.Extensions.DependencyInjection;
 
 public static class DetectorsModule
@@ -16,6 +17,7 @@ public static class DetectorsModule
         services.AddSingleton<IPersonNameDetector, PersonNameDetector>();
         services.AddSingleton<IAddressDetector, AddressDetector>();
         services.AddSingleton<IInstallationNumberDetector, InstallationNumberDetector>();
+        services.AddSingleton<IPossiblePersonalDataAnalyzer, PossiblePersonalDataAnalyzer>();
 
         services.AddSingleton<IReadOnlyList<IDetector>>(sp =>
         {
@@ -34,7 +36,8 @@ public static class DetectorsModule
         services.AddSingleton<IDetectionEngine>(sp =>
         {
             var detectors = sp.GetRequiredService<IReadOnlyList<IDetector>>();
-            return new DetectionEngine(detectors);
+            var analyzer = sp.GetService<IPossiblePersonalDataAnalyzer>();
+            return new DetectionEngine(detectors, analyzer);
         });
 
         return services;

@@ -237,6 +237,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" Background="#F8FAFC" Padding="12,10" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1">
@@ -252,8 +253,8 @@
                             <StackPanel Grid.Row="0" Grid.Column="0">
                                 <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <TextBlock Text="{Binding Detections.Count, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding DefiniteCount, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </StackPanel>
                             <Button Grid.Row="0" Grid.Column="1" Content="Kuyruğu Temizle" Command="{Binding ClearBatchCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" FontSize="10" VerticalAlignment="Center" ToolTip="Toplu işlem kuyruğunu temizle"/>
@@ -283,7 +284,7 @@
                         </Grid>
                     </Border>
 
-                    <ListView Grid.Row="1" ItemsSource="{Binding Detections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListView Grid.Row="1" ItemsSource="{Binding DefiniteDetections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="10,8" Background="White">
@@ -333,7 +334,46 @@
                         </ListView.ItemContainerStyle>
                     </ListView>
 
-                    <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12,10" Background="#F8FAFC">
+                    <!-- Olası Kişisel Veri -->
+                    <Border Grid.Row="2" Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="0,1,0,1" Padding="12,8" Visibility="{Binding HasPossibleDetections, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="⚠" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBlock Text="Olası Kişisel Veri" FontWeight="Bold" FontSize="11" Foreground="#92400E" VerticalAlignment="Center"/>
+                                <Border Background="#FEF3C7" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" BorderBrush="#FDE68A" BorderThickness="1">
+                                    <TextBlock Text="{Binding PossibleCount, StringFormat='{}{0}'}" FontSize="10" Foreground="#92400E" FontWeight="SemiBold"/>
+                                </Border>
+                                <TextBlock Text="Medium" FontSize="10" Foreground="#92400E" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            </StackPanel>
+                            <ListView ItemsSource="{Binding PossibleDetections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" MaxHeight="120" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="#FDE68A" BorderThickness="0,0,0,1" Padding="8,6" Background="#FFFBEB">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" Margin="0,2,6,0" ToolTip="Olası kişisel veriyi maskele"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="Olası Kişisel Veri" FontWeight="SemiBold" FontSize="11" Foreground="#92400E"/>
+                                                        <Border Background="#FEF3C7" CornerRadius="4" Padding="4,1" Margin="6,0,0,0" BorderBrush="#FDE68A" BorderThickness="1">
+                                                            <TextBlock Text="Medium" FontSize="9" Foreground="#92400E" FontWeight="SemiBold"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Value}" FontSize="11" Foreground="#92400E" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                    <TextBlock Text="{Binding Properties[possible_reason]}" FontSize="9" Foreground="#B45309" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="12,10" Background="#F8FAFC">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>

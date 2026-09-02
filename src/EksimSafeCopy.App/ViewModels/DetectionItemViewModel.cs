@@ -78,6 +78,7 @@ public sealed class DetectionItemViewModel : ViewModelBase
         DetectionType.TaxId => "Vergi No",
         DetectionType.PassportNo => "Pasaport No",
         DetectionType.CreditCard => "Kredi Kartı",
+        DetectionType.PossiblePersonalData => "Olası Kişisel Veri",
         _ => type.ToString()
     };
 }

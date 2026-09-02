@@ -91,6 +91,7 @@ internal static class PartialMaskingPolicy
             DetectionType.CreditCard => MaskCreditCard(value),
             DetectionType.Email => MaskEmail(value),
             DetectionType.Address => MaskAddress(value),
+            DetectionType.PossiblePersonalData => "[POSSIBLE_PII]",
             _ => MaskGeneric(value)
         };
     }

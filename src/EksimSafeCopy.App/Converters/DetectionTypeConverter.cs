@@ -26,6 +26,7 @@ public sealed class DetectionTypeConverter : IValueConverter
                 DetectionType.TaxId => "Vergi No",
                 DetectionType.PassportNo => "Pasaport No",
                 DetectionType.CreditCard => "Kredi Kartı",
+                DetectionType.PossiblePersonalData => "Olası Kişisel Veri",
                 _ => type.ToString()
             };
         }
