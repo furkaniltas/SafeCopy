@@ -231,6 +231,7 @@ private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocume
         services.AddSingleton<IPersonNameDetector, EksimSafeCopy.Detectors.Detection.Detectors.PersonNameDetector>();
         services.AddSingleton<IAddressDetector, EksimSafeCopy.Detectors.Detection.Detectors.AddressDetector>();
         services.AddSingleton<IInstallationNumberDetector, EksimSafeCopy.Detectors.Detection.Detectors.InstallationNumberDetector>();
+        services.AddSingleton<IIbanDetector, EksimSafeCopy.Detectors.Detection.Detectors.IbanDetector>();
 
         services.AddSingleton<IReadOnlyList<IDetector>>(sp =>
         {
@@ -242,7 +243,8 @@ private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocume
                 sp.GetRequiredService<IBirthDateDetector>(),
                 sp.GetRequiredService<IPersonNameDetector>(),
                 sp.GetRequiredService<IAddressDetector>(),
-                sp.GetRequiredService<IInstallationNumberDetector>()
+                sp.GetRequiredService<IInstallationNumberDetector>(),
+                sp.GetRequiredService<IIbanDetector>()
             }.AsReadOnly();
         });
 

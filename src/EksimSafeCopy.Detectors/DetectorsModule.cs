@@ -17,6 +17,7 @@ public static class DetectorsModule
         services.AddSingleton<IPersonNameDetector, PersonNameDetector>();
         services.AddSingleton<IAddressDetector, AddressDetector>();
         services.AddSingleton<IInstallationNumberDetector, InstallationNumberDetector>();
+        services.AddSingleton<IIbanDetector, IbanDetector>();
         services.AddSingleton<IPossiblePersonalDataAnalyzer, PossiblePersonalDataAnalyzer>();
 
         services.AddSingleton<IReadOnlyList<IDetector>>(sp =>
@@ -29,7 +30,8 @@ public static class DetectorsModule
                 sp.GetRequiredService<IBirthDateDetector>(),
                 sp.GetRequiredService<IPersonNameDetector>(),
                 sp.GetRequiredService<IAddressDetector>(),
-                sp.GetRequiredService<IInstallationNumberDetector>()
+                sp.GetRequiredService<IInstallationNumberDetector>(),
+                sp.GetRequiredService<IIbanDetector>()
             }.AsReadOnly();
         });
 
@@ -51,3 +53,4 @@ public interface IBirthDateDetector : IDetector { }
 public interface IPersonNameDetector : IDetector { }
 public interface IAddressDetector : IDetector { }
 public interface IInstallationNumberDetector : IDetector { }
+public interface IIbanDetector : IDetector { }
