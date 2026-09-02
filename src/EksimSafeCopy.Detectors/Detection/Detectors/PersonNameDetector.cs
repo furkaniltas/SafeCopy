@@ -221,10 +221,11 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 return false;
         }
         
-        // Reject if negative keywords appear anywhere (covers kurum/hukuk phrases)
-        if (NegativeKeywords.Any(k => candidate.Contains(k, StringComparison.OrdinalIgnoreCase))) return false;
-        // Also reject if field label appears as substring (e.g., "Doğum Tarihi Ahmet" - but candidate is 2-4 words, so check exact)
-        if (FieldLabels.Any(f => lower.Contains(f))) return false;
+        // Reject if negative keywords appear as whole token/phrase, not arbitrary substring inside another word
+        // "ad" must match standalone "ad", not "Maden" (contains "ad" as substring)
+        if (NegativeKeywords.Any(k => ContainsWholeWord(candidate, k))) return false;
+        // Also reject if field label appears as whole phrase (e.g., "Doğum Tarihi Ahmet")
+        if (FieldLabels.Any(f => ContainsWholeWord(lower, f) || ContainsWholeWord(candidate, f))) return false;
 
         return true;
     }
@@ -239,6 +240,30 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         if (lower == "dış kapı" || lower.Contains("dış kapı")) return true;
         // Also check for "Kapı" alone with İç/Bahçe etc. already covered
         return AddressComponents.Any(k => lower == k || lower.Contains(k));
+    }
+
+    private static bool ContainsWholeWord(string text, string keyword)
+    {
+        if (string.IsNullOrWhiteSpace(keyword)) return false;
+        // Use word-boundary check with Turkish-aware case-insensitive comparison
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lowerText = text.ToLower(tr);
+        var lowerKeyword = keyword.ToLower(tr);
+        // For single-word keyword, check as whole token
+        if (!lowerKeyword.Contains(' '))
+        {
+            var words = lowerText.Split(new[] { ' ', '\t', '.', ',', ';', ':', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var w in words)
+            {
+                var clean = w.TrimEnd('.', ',', ';', ':', '!', '?', '"', '\'', '’', '‘');
+                if (clean == lowerKeyword) return true;
+            }
+            return false;
+        }
+        // For phrase, check with word boundaries via regex-like contains with spaces
+        // Ensure keyword appears with word boundaries (space/punct or start/end)
+        var pattern = $@"\b{System.Text.RegularExpressions.Regex.Escape(lowerKeyword)}\b";
+        return System.Text.RegularExpressions.Regex.IsMatch(lowerText, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private bool StartsWithContextualPrefix(string candidate)

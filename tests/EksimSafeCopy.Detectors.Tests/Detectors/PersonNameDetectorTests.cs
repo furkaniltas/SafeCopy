@@ -330,4 +330,67 @@ public class PersonNameDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Where(d => d.Type == DetectionType.FullName && d.Value == "İç Kapı").Should().BeEmpty();
     }
+
+    [Fact]
+    public void Detect_ValidSurname_PoyrazMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Poyraz Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Poyraz Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_SirinE_Maden_ReturnsDetection()
+    {
+        var document = CreateDocument("Şirin E. Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Şirin E. Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_JaleI_Maden_ReturnsDetection()
+    {
+        var document = CreateDocument("Jale İ. Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Jale İ. Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_HalilMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Halil Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Halil Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_HulyaTasMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Hülya Taş Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Hülya Taş Maden");
+    }
+
+    [Fact]
+    public void Detect_NegativeKeyword_AdSoyad_NotDetected()
+    {
+        var document = CreateDocument("ad soyad");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.ToLower().Contains("ad soyad")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_KnownPositive_SavasSinanYildirim_ReturnsDetection()
+    {
+        var document = CreateDocument("Savaş Sinan Yıldırım");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Savaş Sinan Yıldırım");
+    }
 }
