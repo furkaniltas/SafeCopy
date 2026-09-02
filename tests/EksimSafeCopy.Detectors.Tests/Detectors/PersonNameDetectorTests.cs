@@ -393,4 +393,42 @@ public class PersonNameDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Savaş Sinan Yıldırım");
     }
+
+    [Fact]
+    public void Detect_MultilineBoundary_FullNameDoesNotSpanNewlineIntoLabel()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz\nTelefon: 0555 123 45 67");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("Ahmet Yılmaz") && d.Value.Contains("Telefon")).Should().BeEmpty();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("\n")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_MultilineBoundary_NameStillDetected()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz\nTelefon: 0555 123 45 67");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
+    }
+
+    [Fact]
+    public void Detect_MultilineBoundary_AhmetYilmazTelefon_NotSingleCandidate()
+    {
+        var document = CreateDocument("Ahmet Yılmaz\nTelefon");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz\nTelefon").Should().BeEmpty();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("\n")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_SameLine_NameStillDetected()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
+    }
 }

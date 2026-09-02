@@ -13,11 +13,11 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
     public override string Description => "Detects Turkish person names with contextual validation";
 
     private static readonly Regex NamePattern = new(
-        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1,3}\b",
+        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:[ \t]+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1,3}\b",
         RegexOptions.Compiled);
 
     private static readonly Regex UpperCaseNamePattern = new(
-        @"\b[A-ZÇĞİÖŞÜ]{2,}(?:\s+[A-ZÇĞİÖŞÜ]{2,}){1,3}\b",
+        @"\b[A-ZÇĞİÖŞÜ]{2,}(?:[ \t]+[A-ZÇĞİÖŞÜ]{2,}){1,3}\b",
         RegexOptions.Compiled);
 
     private static readonly HashSet<string> TurkishCities = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
@@ -80,7 +80,7 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
     };
 
     private static readonly Regex MiddleInitialPattern = new(
-        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s+[A-ZÇĞİÖŞÜ]\.\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\b",
+        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+[ \t]+[A-ZÇĞİÖŞÜ]\.[ \t]+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\b",
         RegexOptions.Compiled);
 
     protected override IReadOnlyList<Detection> DetectOnPage(DocumentPage page, NormalizedText normalizedText, CancellationToken cancellationToken)
@@ -109,7 +109,20 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 }
                 else
                 {
-                    if (!IsValidNameCandidate(candidate)) continue;
+                    if (!IsValidNameCandidate(candidate))
+                    {
+                        // Greedy regex may have swallowed trailing field label (e.g., "Ahmet Yılmaz Telefon")
+                        // after whitespace collapsing. Try shorter prefix by dropping trailing NegativeKeywords/field-label words.
+                        var fallback = TryExtractValidPrefix(candidate);
+                        if (fallback != null)
+                        {
+                            candidate = fallback;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
                     if (IsAddressComponent(candidate)) continue;
                 }
 
@@ -240,6 +253,30 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         if (lower == "dış kapı" || lower.Contains("dış kapı")) return true;
         // Also check for "Kapı" alone with İç/Bahçe etc. already covered
         return AddressComponents.Any(k => lower == k || lower.Contains(k));
+    }
+
+    private string? TryExtractValidPrefix(string candidate)
+    {
+        var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length <= 2) return null;
+        // Try dropping 1..(words.Length-2) trailing words
+        for (int keep = words.Length - 1; keep >= 2; keep--)
+        {
+            var prefix = string.Join(" ", words.Take(keep));
+            if (IsValidNameCandidate(prefix) && !IsAddressComponent(prefix))
+            {
+                // Ensure dropped suffix is composed of field-label / negative keywords (e.g., Telefon, Adres)
+                var suffix = string.Join(" ", words.Skip(keep));
+                var tr = new System.Globalization.CultureInfo("tr-TR");
+                var suffixLower = suffix.ToLower(tr);
+                bool suffixIsLabel = NegativeKeywords.Contains(suffixLower) || FieldLabels.Contains(suffixLower) || ContainsWholeWord(suffixLower, "telefon") || ContainsWholeWord(suffixLower, "adres") || ContainsWholeWord(suffixLower, "tc");
+                if (suffixIsLabel || keep == words.Length - 1)
+                {
+                    return prefix;
+                }
+            }
+        }
+        return null;
     }
 
     private static bool ContainsWholeWord(string text, string keyword)
