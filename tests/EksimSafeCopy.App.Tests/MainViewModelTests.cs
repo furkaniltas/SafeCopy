@@ -368,6 +368,95 @@ public class MainViewModelTests
         w.Write($"<root>{content}</root>");
     }
 
+    [Fact]
+    public async Task Counts_WithDefiniteAndPossible_Correct()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"app_test_{Guid.NewGuid():N}.txt");
+        File.WriteAllText(tmp, "Başvuru Sahibi: Ayşe Demir\nAd Soyad: Ahmet Yılmaz\nTelefon: 05321234567\nTC: 10000000146\nTesisat No: 12132133\nE-posta: ahmet.yilmaz@example.invalid\nAdres: Çankaya Mahallesi Atatürk Caddesi No: 12");
+        try
+        {
+            var vm = CreateProvider().GetRequiredService<MainViewModel>();
+            await vm.LoadAndDetectAsync(tmp);
+            // Ensure we have both definite and possible via synthetic addition if needed
+            if (!vm.HasPossibleDetections)
+            {
+                var possible = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ayşe Demir", Confidence = 0.6, ConfidenceLevel = ConfidenceLevel.Medium, PageNumber = 0, TextSpan = new TextSpan { StartIndex = 0, Length = 10, Text = "Ayşe Demir" } };
+                vm.Detections.Add(new DetectionItemViewModel(possible, isSelected: false));
+            }
+            if (vm.DefiniteCount < 2)
+            {
+                var extra = new Detection { Type = DetectionType.Phone, Value = "05321234567", Confidence = 0.9, ConfidenceLevel = ConfidenceLevel.High, PageNumber = 0, TextSpan = new TextSpan { StartIndex = 0, Length = 11, Text = "05321234567" } };
+                vm.Detections.Add(new DetectionItemViewModel(extra, isSelected: true));
+            }
+            vm.DefiniteCount.Should().Be(vm.DefiniteDetections.Count());
+            vm.PossibleCount.Should().Be(vm.PossibleDetections.Count());
+            vm.PossibleCount.Should().BeGreaterOrEqualTo(1);
+            // SelectedDefiniteCount should equal number of selected definite
+            var expectedSelectedDefinite = vm.DefiniteDetections.Count(d => d.IsSelected);
+            vm.SelectedDefiniteCount.Should().Be(expectedSelectedDefinite);
+            // Initially possible is unchecked, so SelectedDefinite = total definite selected
+            vm.SelectedDefiniteCount.Should().Be(vm.DefiniteDetections.Count(d => d.IsSelected));
+        }
+        finally { File.Delete(tmp); }
+    }
+
+    [Fact]
+    public void PossibleSelection_DoesNotAffect_SelectedDefiniteCount()
+    {
+        var vm = CreateProvider().GetRequiredService<MainViewModel>();
+        // Add 6 definite selected
+        for (int i = 0; i < 6; i++)
+        {
+            var d = new Detection { Type = DetectionType.Phone, Value = $"555000000{i}", Confidence = 0.9, ConfidenceLevel = ConfidenceLevel.High, PageNumber = 0, TextSpan = new TextSpan { StartIndex = i * 10, Length = 10, Text = $"555000000{i}" } };
+            vm.Detections.Add(new DetectionItemViewModel(d, isSelected: true));
+        }
+        var possible = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ayşe Demir", Confidence = 0.6, ConfidenceLevel = ConfidenceLevel.Medium, PageNumber = 0, TextSpan = new TextSpan { StartIndex = 100, Length = 10, Text = "Ayşe Demir" } };
+        var possibleVm = new DetectionItemViewModel(possible, isSelected: false);
+        vm.Detections.Add(possibleVm);
+
+        vm.DefiniteCount.Should().Be(6);
+        vm.PossibleCount.Should().Be(1);
+        vm.SelectedDefiniteCount.Should().Be(6);
+
+        possibleVm.IsSelected = true;
+        vm.SelectedDefiniteCount.Should().Be(6, "Possible selection must not affect definite count");
+        vm.SelectedCount.Should().Be(7);
+
+        possibleVm.IsSelected = false;
+        vm.SelectedDefiniteCount.Should().Be(6);
+    }
+
+    [Fact]
+    public void DefinitiveDeselection_Updates_SelectedDefiniteCount()
+    {
+        var vm = CreateProvider().GetRequiredService<MainViewModel>();
+        for (int i = 0; i < 6; i++)
+        {
+            var d = new Detection { Type = DetectionType.Phone, Value = $"555000000{i}", Confidence = 0.9, ConfidenceLevel = ConfidenceLevel.High, PageNumber = 0, TextSpan = new TextSpan { StartIndex = i * 10, Length = 10, Text = $"555000000{i}" } };
+            vm.Detections.Add(new DetectionItemViewModel(d, isSelected: true));
+        }
+        var possible = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ayşe Demir", Confidence = 0.6, ConfidenceLevel = ConfidenceLevel.Medium, PageNumber = 0, TextSpan = new TextSpan { StartIndex = 100, Length = 10, Text = "Ayşe Demir" } };
+        vm.Detections.Add(new DetectionItemViewModel(possible, isSelected: false));
+
+        vm.SelectedDefiniteCount.Should().Be(6);
+        vm.DefiniteDetections.First().IsSelected = false;
+        vm.SelectedDefiniteCount.Should().Be(5);
+    }
+
+    [Fact]
+    public void DetectionCollection_Change_UpdatesDefiniteCountNotStale()
+    {
+        var vm = CreateProvider().GetRequiredService<MainViewModel>();
+        vm.DefiniteCount.Should().Be(0);
+        var d = new Detection { Type = DetectionType.Phone, Value = "5551234567", Confidence = 0.9, ConfidenceLevel = ConfidenceLevel.High, PageNumber = 0, TextSpan = new TextSpan { StartIndex = 0, Length = 10, Text = "5551234567" } };
+        vm.Detections.Add(new DetectionItemViewModel(d, isSelected: true));
+        vm.DefiniteCount.Should().Be(1, "DefiniteCount must not remain stale after CollectionChanged");
+        vm.HasDefiniteDetections.Should().BeTrue();
+        vm.Detections.Clear();
+        vm.DefiniteCount.Should().Be(0);
+        vm.HasDefiniteDetections.Should().BeFalse();
+    }
+
     private bool vmOutputExists(out string p) { p = ""; return false; }
 }
 

@@ -253,8 +253,10 @@
                             <StackPanel Grid.Row="0" Grid.Column="0">
                                 <TextBlock Text="Tespitler" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BodyTextBrush}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Text="{Binding DefiniteCount, StringFormat='Toplam: {0}'}" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding SelectedCount, StringFormat='Seçili: {0}'}" FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding DefiniteCount, StringFormat='Kesin Tespitler ({0})'}" FontSize="11" Foreground="{StaticResource BodyTextBrush}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                    <TextBlock FontSize="11" Foreground="{StaticResource PrimaryGreen}" FontWeight="SemiBold">
+                                        <Run Text="Seçili: "/><Run Text="{Binding SelectedDefiniteCount, Mode=OneWay}"/><Run Text=" / "/><Run Text="{Binding DefiniteCount, Mode=OneWay}"/>
+                                    </TextBlock>
                                 </StackPanel>
                             </StackPanel>
                             <Button Grid.Row="0" Grid.Column="1" Content="Kuyruğu Temizle" Command="{Binding ClearBatchCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" FontSize="10" VerticalAlignment="Center" ToolTip="Toplu işlem kuyruğunu temizle"/>
@@ -339,7 +341,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="⚠" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="Olası Kişisel Veri" FontWeight="Bold" FontSize="11" Foreground="#92400E" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding PossibleCount, StringFormat='Olası Kişisel Veriler ({0})'}" FontWeight="Bold" FontSize="11" Foreground="#92400E" VerticalAlignment="Center"/>
                                 <Border Background="#FEF3C7" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" BorderBrush="#FDE68A" BorderThickness="1">
                                     <TextBlock Text="{Binding PossibleCount, StringFormat='{}{0}'}" FontSize="10" Foreground="#92400E" FontWeight="SemiBold"/>
                                 </Border>

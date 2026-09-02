@@ -82,6 +82,7 @@ public sealed class MainViewModel : ViewModelBase
         _batchProcessor = batchProcessor;
 
         Detections = new ObservableCollection<DetectionItemViewModel>();
+        Detections.CollectionChanged += OnDetectionsCollectionChanged;
         BatchItems = new ObservableCollection<BatchItemViewModel>();
         BatchItems.CollectionChanged += OnBatchCollectionChanged;
 
@@ -275,6 +276,7 @@ public sealed class MainViewModel : ViewModelBase
     public IEnumerable<DetectionItemViewModel> DefiniteDetections => Detections.Where(d => d.Type != DetectionType.PossiblePersonalData);
     public bool HasDefiniteDetections => DefiniteDetections.Any();
     public int DefiniteCount => DefiniteDetections.Count();
+    public int SelectedDefiniteCount => DefiniteDetections.Count(d => d.IsSelected);
 
     private MaskingMode _selectedMaskingMode = MaskingMode.FullRedaction;
     public MaskingMode SelectedMaskingMode
@@ -596,6 +598,26 @@ public sealed class MainViewModel : ViewModelBase
         System.Windows.Input.CommandManager.InvalidateRequerySuggested();
     }
 
+    private void OnDetectionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RaiseDetectionCountProperties();
+    }
+
+    private void RaiseDetectionCountProperties()
+    {
+        OnPropertyChanged(nameof(HasDetections));
+        OnPropertyChanged(nameof(DefiniteCount));
+        OnPropertyChanged(nameof(DefiniteDetections));
+        OnPropertyChanged(nameof(HasDefiniteDetections));
+        OnPropertyChanged(nameof(PossibleCount));
+        OnPropertyChanged(nameof(PossibleDetections));
+        OnPropertyChanged(nameof(HasPossibleDetections));
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(SelectedDefiniteCount));
+        OnPropertyChanged(nameof(CanRedact));
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+    }
+
     private async Task OpenFileAsync()
     {
         var filter = FileDialogService.SupportedFilesFilter;
@@ -783,18 +805,14 @@ public sealed class MainViewModel : ViewModelBase
                         if (e.PropertyName == nameof(DetectionItemViewModel.IsSelected))
                         {
                             OnPropertyChanged(nameof(SelectedCount));
+                            OnPropertyChanged(nameof(SelectedDefiniteCount));
                             OnPropertyChanged(nameof(CanRedact));
                             System.Windows.Input.CommandManager.InvalidateRequerySuggested();
                         }
                     };
                     Detections.Add(vm);
                 }
-                OnPropertyChanged(nameof(HasDetections));
-                OnPropertyChanged(nameof(SelectedCount));
-                OnPropertyChanged(nameof(HasPossibleDetections));
-                OnPropertyChanged(nameof(PossibleCount));
-                OnPropertyChanged(nameof(CanRedact));
-                System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+                RaiseDetectionCountProperties();
             }).ConfigureAwait(false);
 
             // Update preview with bbox markers using CoordinateSystem
@@ -1229,11 +1247,7 @@ public sealed class MainViewModel : ViewModelBase
         SelectedDetection = null;
         ProcessingState = ProcessingState.Idle;
         StatusMessage = "Yeni tarama için dosya seçin.";
-        OnPropertyChanged(nameof(HasDetections));
-        OnPropertyChanged(nameof(SelectedCount));
-        OnPropertyChanged(nameof(HasPossibleDetections));
-        OnPropertyChanged(nameof(PossibleCount));
-        OnPropertyChanged(nameof(CanRedact));
+        RaiseDetectionCountProperties();
     }
 
     private void OpenOutput()
