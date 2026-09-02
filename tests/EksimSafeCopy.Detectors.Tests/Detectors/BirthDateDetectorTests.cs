@@ -182,6 +182,96 @@ public class BirthDateDetectorTests
         result.IsSuccess.Should().BeTrue();
         var detection = result.Value.First(d => d.Type == DetectionType.Date);
         detection.Properties.Should().ContainKey("format");
-        detection.Properties["format"].Should().BeOneOf("dot", "slash", "dash", "iso");
+        detection.Properties["format"].Should().BeOneOf("dot", "slash", "dash", "iso", "iso_datetime", "textual", "numeric_time", "ymd_time");
+    }
+
+    [Fact]
+    public void Detect_IsoDateTime_WithTimezone_ReturnsDetection()
+    {
+        var document = CreateDocument("Teslim günü 2027-04-14T07:01:07+03:00");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "2027-04-14T07:01:07+03:00");
+    }
+
+    [Fact]
+    public void Detect_IsoDateTime_WithoutTimezone_ReturnsDetection()
+    {
+        var document = CreateDocument("2024-09-06T12:02:23");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "2024-09-06T12:02:23");
+    }
+
+    [Fact]
+    public void Detect_TextualMonth_Full_ReturnsDetection()
+    {
+        var document = CreateDocument("Randevu 7 Şubat 2028 saat 19:58");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "7 Şubat 2028 saat 19:58");
+    }
+
+    [Fact]
+    public void Detect_TextualMonth_Abbreviated_ReturnsDetection()
+    {
+        var document = CreateDocument("01 Şub 2023, 00:31:02");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "01 Şub 2023");
+    }
+
+    [Fact]
+    public void Detect_TextualMonth_SingleDigitDay_ReturnsDetection()
+    {
+        var document = CreateDocument("trh:5 Nisan 2026 saat 06:52");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "5 Nisan 2026 saat 06:52");
+    }
+
+    [Fact]
+    public void Detect_NumericWithTime_ReturnsDetection()
+    {
+        var document = CreateDocument("Tarih 12.07.2029 17:48");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "12.07.2029 17:48");
+    }
+
+    [Fact]
+    public void Detect_YmdWithTime_ReturnsDetection()
+    {
+        var document = CreateDocument("2026/02/02 saat 02.46.16");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "2026/02/02 saat 02.46.16");
+    }
+
+    [Fact]
+    public void Detect_InvalidDate_31Feb_NotDetected()
+    {
+        var document = CreateDocument("31.02.2027");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.Date && d.Value == "31.02.2027");
+    }
+
+    [Fact]
+    public void Detect_TurkishChars_Preserved()
+    {
+        var document = CreateDocument("5 Nisan 2026");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value.Contains("Nisan"));
+    }
+
+    [Fact]
+    public void Detect_FalsePositive_AccountNumber_NotDetected()
+    {
+        var document = CreateDocument("SPR-2027-VY7ZUB");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Date).Should().BeEmpty();
     }
 }
