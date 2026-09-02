@@ -37,7 +37,16 @@ public sealed class RedactionPlanner : IRedactionPlanner
         {
             var operations = new List<RedactionOperation>();
 
-            foreach (var detection in detections)
+            // Sort definitive first to prioritize overlap deduplication
+            var sorted = detections
+                .Where(d => d.State != DetectionState.Deselected && d.State != DetectionState.FalsePositive)
+                .Where(d => d.Confidence >= options.ConfidenceThreshold)
+                .OrderBy(d => d.Type == DetectionType.PossiblePersonalData ? 1 : 0)
+                .ThenBy(d => d.PageNumber)
+                .ThenBy(d => d.TextSpan?.StartIndex ?? 0)
+                .ToList();
+
+            foreach (var detection in sorted)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -47,12 +56,24 @@ public sealed class RedactionPlanner : IRedactionPlanner
                 if (detection.Confidence < options.ConfidenceThreshold)
                     continue;
 
-                // PossiblePersonalData is not supported for PartialMask (policy undefined) -> skip
-                if (detection.Type == DetectionType.PossiblePersonalData && options.Mode == MaskingMode.PartialMask)
+                // Overlap deduplication: only PossiblePersonalData that overlaps with already-planned definitive is skipped (definitive prioritized)
+                if (detection.Type == DetectionType.PossiblePersonalData && detection.TextSpan != null && operations.Any(o => o.PageNumber == detection.PageNumber && o.TextSpan != null && SpansOverlap(o.TextSpan, detection.TextSpan)))
                     continue;
 
-                var strategy = ResolveStrategy(options);
-                var replacementText = strategy.GetReplacementText(detection.Type, detection.Value ?? string.Empty, options);
+                string replacementText;
+                RedactionStrategy strategyType;
+                if (detection.Type == DetectionType.PossiblePersonalData)
+                {
+                    // PossiblePersonalData: fail-secure, always [POSSIBLE_PII] when selected, for both Full and Partial
+                    replacementText = "[POSSIBLE_PII]";
+                    strategyType = RedactionStrategy.TypeLabel;
+                }
+                else
+                {
+                    var strategy = ResolveStrategy(options);
+                    replacementText = strategy.GetReplacementText(detection.Type, detection.Value ?? string.Empty, options);
+                    strategyType = strategy.Type;
+                }
 
                 var operation = new RedactionOperation
                 {
@@ -62,7 +83,7 @@ public sealed class RedactionPlanner : IRedactionPlanner
                     TextSpan = detection.TextSpan,
                     BoundingBox = detection.Location,
                     CoordinateSystem = detection.Source?.Format != null ? null : null,
-                    Strategy = strategy.Type,
+                    Strategy = strategyType,
                     ReplacementText = replacementText,
                     Confidence = detection.Confidence,
                     State = RedactionOperationState.Pending
@@ -93,5 +114,10 @@ public sealed class RedactionPlanner : IRedactionPlanner
     public async Task<Result<RedactionPlan>> CreatePlanAsync(Document document, IReadOnlyList<Detection> detections, RenderOptions options, CancellationToken cancellationToken = default)
     {
         return await Task.Run(() => CreatePlan(document, detections, options, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool SpansOverlap(TextSpan a, TextSpan b)
+    {
+        return a.StartIndex < b.EndIndex && b.StartIndex < a.EndIndex;
     }
 }

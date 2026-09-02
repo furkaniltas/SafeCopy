@@ -250,5 +250,109 @@ public class RedactionPlannerTests
         async.Value.Operations.Count.Should().Be(sync.Value.Operations.Count);
         async.Value.DocumentId.Should().Be(sync.Value.DocumentId);
     }
+
+    [Fact]
+    public void Possible_Partial_Deselected_NoOperation()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "Ahmet Yılmaz"));
+        var d = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 0, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Deselected };
+        var options = new RenderOptions { Mode = MaskingMode.PartialMask };
+        var result = _planner.CreatePlan(doc, new[] { d }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Possible_Partial_Selected_ProducesPossiblePiiPlaceholder()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "Ahmet Yılmaz"));
+        var d = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 0, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected };
+        var options = new RenderOptions { Mode = MaskingMode.PartialMask };
+        var result = _planner.CreatePlan(doc, new[] { d }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().HaveCount(1);
+        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+        result.Value.Operations[0].DetectionType.Should().Be(DetectionType.PossiblePersonalData);
+    }
+
+    [Fact]
+    public void Possible_Full_Deselected_NoOperation()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "Ahmet Yılmaz"));
+        var d = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 0, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Deselected };
+        var options = new RenderOptions { Mode = MaskingMode.FullRedaction, UseTypePlaceholder = true };
+        var result = _planner.CreatePlan(doc, new[] { d }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Possible_Full_Selected_ProducesPossiblePiiPlaceholder()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "Ahmet Yılmaz"));
+        var d = new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 0, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected };
+        var options = new RenderOptions { Mode = MaskingMode.FullRedaction, UseTypePlaceholder = true };
+        var result = _planner.CreatePlan(doc, new[] { d }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().HaveCount(1);
+        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+    }
+
+    [Fact]
+    public void DefinitiveAndPossible_SameSpan_BothSelected_PrioritizesDefinitive()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "12132133"));
+        var definitive = new Detection { Type = DetectionType.TesisatNo, Value = "12132133", TextSpan = new TextSpan { StartIndex = 0, Length = 8, Text = "12132133" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected };
+        var possible = new Detection { Type = DetectionType.PossiblePersonalData, Value = "12132133", TextSpan = new TextSpan { StartIndex = 0, Length = 8, Text = "12132133" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected };
+        var options = new RenderOptions { Mode = MaskingMode.PartialMask };
+        var result = _planner.CreatePlan(doc, new[] { definitive, possible }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().HaveCount(1);
+        result.Value.Operations[0].DetectionType.Should().Be(DetectionType.TesisatNo);
+        result.Value.Operations[0].ReplacementText.Should().NotBe("[POSSIBLE_PII]");
+    }
+
+    [Fact]
+    public void DefinitiveDeselected_PossibleSelected_SameSpan_ProducesPossible()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "12132133"));
+        var definitive = new Detection { Type = DetectionType.TesisatNo, Value = "12132133", TextSpan = new TextSpan { StartIndex = 0, Length = 8, Text = "12132133" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Deselected };
+        var possible = new Detection { Type = DetectionType.PossiblePersonalData, Value = "12132133", TextSpan = new TextSpan { StartIndex = 0, Length = 8, Text = "12132133" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected };
+        var options = new RenderOptions { Mode = MaskingMode.PartialMask };
+        var result = _planner.CreatePlan(doc, new[] { definitive, possible }, options);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Operations.Should().HaveCount(1);
+        result.Value.Operations[0].DetectionType.Should().Be(DetectionType.PossiblePersonalData);
+        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+    }
+
+    [Fact]
+    public void RealisticScenario_Partial_WithPossibleSelected_ProducesCorrectPlaceholders()
+    {
+        var doc = CreateDocument("test.txt", DF.Txt, CreatePage(1, "Ahmet Yılmaz 0555 123 45 67 12132133 ahmet.yilmaz@example.invalid 14.03.1990 12345678901"));
+        var detections = new[]
+        {
+            new Detection { Type = DetectionType.FullName, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 0, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.Phone, Value = "0555 123 45 67", TextSpan = new TextSpan { StartIndex = 13, Length = 14, Text = "0555 123 45 67" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.TesisatNo, Value = "12132133", TextSpan = new TextSpan { StartIndex = 28, Length = 8, Text = "12132133" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.Email, Value = "ahmet.yilmaz@example.invalid", TextSpan = new TextSpan { StartIndex = 37, Length = 27, Text = "ahmet.yilmaz@example.invalid" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.Date, Value = "14.03.1990", TextSpan = new TextSpan { StartIndex = 65, Length = 10, Text = "14.03.1990" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.TcKimlikNo, Value = "12345678901", TextSpan = new TextSpan { StartIndex = 76, Length = 11, Text = "12345678901" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected },
+            new Detection { Type = DetectionType.PossiblePersonalData, Value = "Ahmet Yılmaz", TextSpan = new TextSpan { StartIndex = 90, Length = 12, Text = "Ahmet Yılmaz" }, PageNumber = 1, Confidence = 0.9, State = DetectionState.Selected }
+        };
+        var options = new RenderOptions { Mode = MaskingMode.PartialMask };
+        // Use planner with all strategies to correctly resolve PartialMask
+        var planner = new RedactionPlanner(new DefaultRedactionStrategy(), new IRedactionStrategy[] { new DefaultRedactionStrategy(), new PartialMaskStrategy(), new FullRedactionStrategy(), new PlaceholderStrategy() });
+        var result = planner.CreatePlan(doc, detections, options);
+        result.IsSuccess.Should().BeTrue();
+        // 6 definitive + 1 possible distinct span = 7 operations
+        result.Value.Operations.Should().HaveCount(7);
+        result.Value.Operations.Count(o => o.DetectionType == DetectionType.PossiblePersonalData).Should().Be(1);
+        result.Value.Operations.First(o => o.DetectionType == DetectionType.PossiblePersonalData).ReplacementText.Should().Be("[POSSIBLE_PII]");
+        // Definitive partial outputs unchanged
+        result.Value.Operations.First(o => o.DetectionType == DetectionType.TcKimlikNo).ReplacementText.Should().Be("*******8901");
+        result.Value.Operations.First(o => o.DetectionType == DetectionType.Phone).ReplacementText.Should().Contain("0555");
+        result.Value.Operations.First(o => o.DetectionType == DetectionType.TesisatNo).ReplacementText.Should().Be("****2133");
+    }
 }
 
