@@ -37,7 +37,7 @@ public sealed class BirthDateDetector : BaseDetector, IBirthDateDetector
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly Regex NumericWithTimePattern = new(
-        @"\b(?:0[1-9]|[12]\d|3[01])[\.\-\/](?:0[1-9]|1[0-2])[\.\-\/](?:19[0-9]{2}|20[0-2]\d)\s+(?:[01]?\d|2[0-3])[:\.][0-5]\d(?::[0-5]\d)?\b",
+        @"\b(?:0?[1-9]|[12]\d|3[01])[\.\-\/](?:0?[1-9]|1[0-2])[\.\-\/](?:19[0-9]{2}|20[0-2]\d)\s+(?:[01]?\d|2[0-3])[:\.][0-5]\d(?::[0-5]\d)?\b",
         RegexOptions.Compiled);
 
     private static readonly Regex YmdWithTimePattern = new(

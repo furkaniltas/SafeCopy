@@ -274,4 +274,85 @@ public class BirthDateDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Where(d => d.Type == DetectionType.Date).Should().BeEmpty();
     }
+
+    [Fact]
+    public void Detect_SingleDigit_DayMonth_8_2_2027_ReturnsDetection()
+    {
+        var document = CreateDocument("8/2/2027 23.22");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "8/2/2027 23.22");
+    }
+
+    [Fact]
+    public void Detect_SingleDigit_9_3_2029_ReturnsDetection()
+    {
+        var document = CreateDocument("9/3/2029 21.32");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "9/3/2029 21.32");
+    }
+
+    [Fact]
+    public void Detect_SingleDigit_1_7_2025_ReturnsDetection()
+    {
+        var document = CreateDocument("1/7/2025 15.52");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "1/7/2025 15.52");
+    }
+
+    [Fact]
+    public void Detect_ZeroPadded_08_02_2027_ReturnsDetection()
+    {
+        var document = CreateDocument("08/02/2027 23.22");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "08/02/2027 23.22");
+    }
+
+    [Fact]
+    public void Detect_ZeroPadded_19_07_2024_ReturnsDetection()
+    {
+        var document = CreateDocument("19/07/2024 00.25");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Date && d.Value == "19/07/2024 00.25");
+    }
+
+    [Fact]
+    public void Detect_Invalid_31_2_2027_NotDetected()
+    {
+        var document = CreateDocument("31/2/2027 23.22");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Date && d.Value == "31/2/2027 23.22").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Invalid_32_1_2027_NotDetected()
+    {
+        var document = CreateDocument("32/1/2027 10.20");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Date).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Invalid_15_13_2027_NotDetected()
+    {
+        var document = CreateDocument("15/13/2027 10.20");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Date).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Invalid_99_99_9999_NotDetected()
+    {
+        var document = CreateDocument("99/99/9999 10.20");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Date).Should().BeEmpty();
+    }
 }
