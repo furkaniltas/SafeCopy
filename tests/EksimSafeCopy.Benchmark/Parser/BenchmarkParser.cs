@@ -42,21 +42,35 @@ public sealed class BenchmarkParser
             if (root.TryGetProperty("source", out var srcEl) && srcEl.ValueKind == JsonValueKind.Object)
                 source = srcEl.GetRawText();
 
-            // Spans / entities / label
+            // Handle info object for scenario/difficulty/id (new curated dataset)
+            if (root.TryGetProperty("info", out var infoEl) && infoEl.ValueKind == JsonValueKind.Object)
+            {
+                if (infoEl.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String)
+                    id = idEl.GetString() ?? id;
+                if (infoEl.TryGetProperty("scenario", out var scEl) && scEl.ValueKind == JsonValueKind.String)
+                    scenario = scEl.GetString() ?? scenario;
+                if (infoEl.TryGetProperty("difficulty", out var diffEl) && diffEl.ValueKind == JsonValueKind.String)
+                    difficulty = diffEl.GetString() ?? difficulty;
+                if (infoEl.TryGetProperty("source", out var srcEl2))
+                    source = srcEl2.ValueKind == JsonValueKind.String ? srcEl2.GetString() ?? source : srcEl2.GetRawText();
+            }
+
+            // Spans / entities / label - handle both array (old) and object (new curated: spans is dict label->[[start,end]])
             var entities = new List<GroundTruthEntity>();
             JsonElement spansEl = default;
-            bool hasSpans = false;
+            bool hasSpansArray = false;
+            bool hasSpansObject = false;
             string[] spanKeys = new[] { "spans", "entities", "label", "labels", "annotations", "ground_truth" };
             foreach (var k in spanKeys)
             {
-                if (root.TryGetProperty(k, out spansEl) && spansEl.ValueKind == JsonValueKind.Array)
+                if (root.TryGetProperty(k, out spansEl))
                 {
-                    hasSpans = true;
-                    break;
+                    if (spansEl.ValueKind == JsonValueKind.Array) { hasSpansArray = true; break; }
+                    if (spansEl.ValueKind == JsonValueKind.Object) { hasSpansObject = true; break; }
                 }
             }
 
-            if (hasSpans)
+            if (hasSpansArray)
             {
                 foreach (var el in spansEl.EnumerateArray())
                 {
@@ -65,7 +79,6 @@ public sealed class BenchmarkParser
                         string label = GetStringField(el, new[] { "label", "category", "type", "entity", "tag" }) ?? "unknown";
                         int start = GetIntField(el, new[] { "start", "start_idx", "begin", "offset" });
                         int end = GetIntField(el, new[] { "end", "end_idx", "stop" });
-                        // Handle case where spans have "start" and "end" but text is not directly provided, we can extract from text
                         string entityText = string.Empty;
                         if (el.TryGetProperty("text", out var txtEl) && txtEl.ValueKind == JsonValueKind.String)
                             entityText = txtEl.GetString() ?? string.Empty;
@@ -88,9 +101,6 @@ public sealed class BenchmarkParser
                     }
                     catch (Exception ex)
                     {
-                        // Malformed entity, skip but record as malformed entity?
-                        // For now, skip this entity and continue
-                        // We could log but not fail entire record
                         entities.Add(new GroundTruthEntity
                         {
                             Label = "malformed",
@@ -103,6 +113,72 @@ public sealed class BenchmarkParser
                             MappingStatus = MappingStatus.UNSUPPORTED,
                             MappingReason = ex.Message
                         });
+                    }
+                }
+            }
+            else if (hasSpansObject)
+            {
+                // New curated: spans is object where key is "label:value" and value is list of [start,end]
+                foreach (var prop in spansEl.EnumerateObject())
+                {
+                    string key = prop.Name;
+                    string label = key.Contains(':') ? key.Substring(0, key.IndexOf(':')) : key;
+                    // The value part after colon is the expected text, but we use span positions for ground truth
+                    if (prop.Value.ValueKind != JsonValueKind.Array) continue;
+                    foreach (var spanEl in prop.Value.EnumerateArray())
+                    {
+                        try
+                        {
+                            int start = 0, end = 0;
+                            if (spanEl.ValueKind == JsonValueKind.Array)
+                            {
+                                var arr = spanEl.EnumerateArray().ToList();
+                                if (arr.Count >= 2)
+                                {
+                                    start = arr[0].GetInt32();
+                                    end = arr[1].GetInt32();
+                                }
+                            }
+                            else if (spanEl.ValueKind == JsonValueKind.Object)
+                            {
+                                start = GetIntField(spanEl, new[] { "start", "begin" });
+                                end = GetIntField(spanEl, new[] { "end", "stop" });
+                            }
+                            string entityText = string.Empty;
+                            if (!string.IsNullOrEmpty(text) && start >= 0 && end <= text.Length && end > start)
+                                entityText = text.Substring(start, end - start);
+                            else if (key.Contains(':'))
+                                entityText = key.Substring(key.IndexOf(':') + 1);
+
+                            var mapping = LabelMappingTable.Resolve(label);
+                            entities.Add(new GroundTruthEntity
+                            {
+                                Label = label,
+                                Start = start,
+                                End = end,
+                                Text = entityText,
+                                Scenario = scenario,
+                                Difficulty = difficulty,
+                                MappedType = mapping.SafeCopyType,
+                                MappingStatus = mapping.Status,
+                                MappingReason = mapping.Reason
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            entities.Add(new GroundTruthEntity
+                            {
+                                Label = "malformed",
+                                Start = 0,
+                                End = 0,
+                                Text = $"parse_error: {ex.Message}",
+                                Scenario = scenario,
+                                Difficulty = difficulty,
+                                MappedType = null,
+                                MappingStatus = MappingStatus.UNSUPPORTED,
+                                MappingReason = ex.Message
+                            });
+                        }
                     }
                 }
             }

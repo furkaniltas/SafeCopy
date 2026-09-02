@@ -198,8 +198,11 @@ public sealed class BenchmarkResult
     public int UnsupportedEntities { get; init; }
     public int AmbiguousEntities { get; init; }
     public BenchmarkMetrics Overall { get; init; } = new();
+    public BenchmarkMetrics OverallStrict { get; init; } = new();
+    public BenchmarkMetrics OverallOverlap { get; init; } = new();
     public List<PerTypeMetrics> PerType { get; init; } = new();
     public List<PerScenarioMetrics> PerScenario { get; init; } = new();
+    public List<PerScenarioMetrics> PerDifficulty { get; init; } = new();
     public int ExactMatches { get; init; }
     public int OverlapMatches { get; init; }
     public int BoundaryMismatches { get; init; }
@@ -207,9 +210,14 @@ public sealed class BenchmarkResult
     public List<EntityMatch> FalsePositives { get; init; } = new();
     public List<EntityMatch> BoundaryMismatchDetails { get; init; } = new();
     public Dictionary<string, int> UnsupportedLabelCounts { get; init; } = new();
+    public Dictionary<string, int> AmbiguousLabelCounts { get; init; } = new();
     public Dictionary<string, int> ScenarioCounts { get; init; } = new();
     public Dictionary<string, int> DifficultyCounts { get; init; } = new();
     public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
     public string DatasetPath { get; init; } = string.Empty;
     public string SafeCopyVersion { get; init; } = string.Empty;
+    public int PossibleDetectionsTotal { get; init; }
+    public int PossibleOverlappingGroundTruth { get; init; }
+    public int PossibleWithoutGroundTruth { get; init; }
+    public Dictionary<string, int> StructuredValidity { get; init; } = new();
 }
