@@ -65,15 +65,30 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "uzman", "danışman", "danisman", "avukat", "avukatı", "avukati",
         "doktor", "doktoru", "doktorun", "hoca", "hocam", "öğretmen", "ogretmen",
         "mühendis", "muhendis", "mimar", "mimarını", "mimarini",
-        "bey", "hanım", "hanim", "bay", "bayan", "sn", "sayın", "sayin"
+        "bey", "hanım", "hanim", "bay", "bayan", "sn", "sayın", "sayin",
+        "av", "av.", "dyt", "dyt.", "uzm", "uzm.", "dr", "dr.", "prof", "prof.", "doç", "doç."
     };
+
+    private static readonly HashSet<string> ContextualPrefixes = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
+    {
+        "sahip", "alıcı", "alici", "danışan", "danisan", "hasta", "kişi", "kisi", "taraf"
+    };
+
+    private static readonly HashSet<string> AddressComponents = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
+    {
+        "iç kapı", "ic kapi", "iç kapı no", "bahçe kapısı", "bahce kapisi", "arka giriş", "arka giris", "blok", "kat"
+    };
+
+    private static readonly Regex MiddleInitialPattern = new(
+        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s+[A-ZÇĞİÖŞÜ]\.\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\b",
+        RegexOptions.Compiled);
 
     protected override IReadOnlyList<Detection> DetectOnPage(DocumentPage page, NormalizedText normalizedText, CancellationToken cancellationToken)
     {
         var detections = new List<Detection>();
         var text = normalizedText.Text;
 
-        var allPatterns = new[] { NamePattern, UpperCaseNamePattern };
+        var allPatterns = new[] { NamePattern, UpperCaseNamePattern, MiddleInitialPattern };
 
         foreach (var pattern in allPatterns)
         {
@@ -83,7 +98,20 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 var candidate = match.Value;
-                if (!IsValidNameCandidate(candidate)) continue;
+                var candidateStartInMatch = 0;
+                // If candidate starts with contextual prefix, must strip and only consider stripped version
+                if (StartsWithContextualPrefix(candidate))
+                {
+                    var stripped = TryStripContextualPrefix(candidate, out var prefixLength);
+                    if (stripped == null || !IsValidNameCandidate(stripped) || IsAddressComponent(stripped)) continue;
+                    candidate = stripped;
+                    candidateStartInMatch = prefixLength;
+                }
+                else
+                {
+                    if (!IsValidNameCandidate(candidate)) continue;
+                    if (IsAddressComponent(candidate)) continue;
+                }
 
                 var contextWindow = GetContextWindow(normalizedText, match.Index, match.Length);
                 var contextFeatures = AnalyzeContext(contextWindow);
@@ -95,8 +123,10 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 
                 if (confidence < ConfidenceThreshold) continue;
                 
-                var originalStart = normalizedText.MapToOriginalPosition(match.Index);
-                var originalEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
+                var adjustedIndex = match.Index + candidateStartInMatch;
+                var adjustedLength = candidate.Length;
+                var originalStart = normalizedText.MapToOriginalPosition(adjustedIndex);
+                var originalEnd = normalizedText.MapToOriginalPosition(adjustedIndex + adjustedLength);
                 
                 var textSpan = new TextSpan
                 {
@@ -166,11 +196,16 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         if (FieldLabels.Contains(lower)) return false;
         if (FieldLabels.Contains(candidate)) return false;
 
+        // Address component false positive: İç Kapı, Bahçe Kapısı etc. are not person names
+        if (IsAddressComponent(candidate)) return false;
+
         var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length < 2 || words.Length > 4) return false;
 
         foreach (var word in words)
         {
+            // Allow single initial like "B." (e.g., Levent B. Yıldırım)
+            if (System.Text.RegularExpressions.Regex.IsMatch(word, @"^[A-ZÇĞİÖŞÜ]\.$")) continue;
             if (word.Length < 2) return false;
             if (TurkishCities.Contains(word)) return false;
             if (NegativeKeywords.Contains(word)) return false;
@@ -180,6 +215,8 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         // Reject if a title appears in the middle of the name
         for (int i = 0; i < words.Length - 1; i++)
         {
+            // Allow single initial with dot (e.g., B.) even if it's not a title
+            if (System.Text.RegularExpressions.Regex.IsMatch(words[i], @"^[A-ZÇĞİÖŞÜ]\.$")) continue;
             if (TurkishTitles.Contains(words[i]))
                 return false;
         }
@@ -190,6 +227,52 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         if (FieldLabels.Any(f => lower.Contains(f))) return false;
 
         return true;
+    }
+
+    private bool IsAddressComponent(string candidate)
+    {
+        var lower = candidate.ToLower(new System.Globalization.CultureInfo("tr-TR"));
+        // Known address components that are falsely detected as names
+        if (lower == "iç kapı" || lower.Contains("iç kapı")) return true;
+        if (lower == "bahçe kapısı" || lower.Contains("bahçe kapısı")) return true;
+        if (lower.Contains("arka giriş")) return true;
+        if (lower == "dış kapı" || lower.Contains("dış kapı")) return true;
+        // Also check for "Kapı" alone with İç/Bahçe etc. already covered
+        return AddressComponents.Any(k => lower == k || lower.Contains(k));
+    }
+
+    private bool StartsWithContextualPrefix(string candidate)
+    {
+        var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 0) return false;
+        var first = words[0].TrimEnd('.');
+        return ContextualPrefixes.Contains(first);
+    }
+
+    private string? TryStripContextualPrefix(string candidate, out int prefixLength)
+    {
+        prefixLength = 0;
+        var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2) return null;
+        var first = words[0].TrimEnd('.');
+        if (!ContextualPrefixes.Contains(first)) return null;
+        // Check if remaining part after prefix is a valid name candidate (at least 2 words, or 2 with initial)
+        var remainingWords = words.Skip(1).ToArray();
+        if (remainingWords.Length < 2) return null;
+        // Do not strip if remaining is just a title (e.g., "Danışan Uzm" -> remaining "Uzm" is title, not name)
+        var remaining = string.Join(" ", remainingWords);
+        var remLower = remaining.ToLower(new System.Globalization.CultureInfo("tr-TR"));
+        // If remaining is exactly a title or address component, do not strip (would create FP)
+        if (TurkishTitles.Contains(remainingWords[0]) && remainingWords.Length == 1) return null;
+        if (IsAddressComponent(remaining)) return null;
+        // If remaining is single title like "Uzm", "Av", "Dyt" - reject
+        if (remainingWords.Length == 1 && TurkishTitles.Contains(remainingWords[0])) return null;
+        // Check if remaining contains only titles (e.g., "Av. Uzm")
+        if (remainingWords.All(w => TurkishTitles.Contains(w.TrimEnd('.')) || System.Text.RegularExpressions.Regex.IsMatch(w, @"^[A-ZÇĞİÖŞÜ]\.$"))) return null;
+
+        // Valid prefix stripping: return remaining and prefix length (including space)
+        prefixLength = words[0].Length + 1; // +1 for space
+        return remaining;
     }
 
     private double CalculateConfidence(string name, ContextFeatures context)
