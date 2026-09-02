@@ -47,6 +47,10 @@ public sealed class RedactionPlanner : IRedactionPlanner
                 if (detection.Confidence < options.ConfidenceThreshold)
                     continue;
 
+                // PossiblePersonalData is not supported for PartialMask (policy undefined) -> skip
+                if (detection.Type == DetectionType.PossiblePersonalData && options.Mode == MaskingMode.PartialMask)
+                    continue;
+
                 var strategy = ResolveStrategy(options);
                 var replacementText = strategy.GetReplacementText(detection.Type, detection.Value ?? string.Empty, options);
 

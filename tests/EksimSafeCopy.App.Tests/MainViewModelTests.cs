@@ -306,10 +306,11 @@ public class MainViewModelTests
             await vm.LoadAndDetectAsync(tmp);
             vm.SelectedFilePath = tmp;
             vm.Detections.Should().HaveCountGreaterThan(1);
-            // Deselect one detection (e.g., second one)
-            var toDeselect = vm.Detections[1];
+            // Deselect one detection (e.g., second one that is selected)
+            var initialSelected = vm.SelectedCount;
+            var toDeselect = vm.Detections.First(d => d.IsSelected);
             toDeselect.IsSelected = false;
-            vm.SelectedCount.Should().Be(vm.Detections.Count - 1);
+            vm.SelectedCount.Should().Be(initialSelected - 1);
             await vm.RedactAsyncForTest();
             vm.ProcessingState.Should().Be(ProcessingState.Success, $"Status: {vm.StatusMessage}");
             vm.VerificationResult.Should().NotBeNull();

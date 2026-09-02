@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using EksimSafeCopy.Core.Models;
 using EksimSafeCopy.Detectors.Detection.Context;
 using EksimSafeCopy.Detectors.Detection.Normalization;
@@ -9,21 +9,30 @@ namespace EksimSafeCopy.Detectors.Detection.PossiblePersonalData;
 public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
 {
     private static readonly Regex NameLikePattern = new(
-        @"\b[A-ZÃ‡ÄÄ°Ã–ÅÃœ][a-zÃ§ÄŸÄ±Ã¶ÅŸÃ¼]+(?:\s+[A-ZÃ‡ÄÄ°Ã–ÅÃœ][a-zÃ§ÄŸÄ±Ã¶ÅŸÃ¼]+){1}\b",
+        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1}\b",
         RegexOptions.Compiled);
 
     private static readonly HashSet<string> PossibleLabels = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
-        "baÅŸvuru sahibi", "ilgili kiÅŸi", "yetkili", "mÃ¼ÅŸteri adÄ±", "adÄ± soyadÄ±", "ad soyad", "yakÄ±nÄ±", "baba adÄ±", "anne adÄ±",
-        "baÅŸvuran", "vekil", "temsilci", "ilgili"
+        "başvuru sahibi", "basvuru sahibi",
+        "ilgili kişi", "ilgili kisi",
+        "yetkili",
+        "müşteri adı", "musteri adi",
+        "adı soyadı", "adi soyadi", "ad soyad",
+        "yakını", "yakini",
+        "baba adı", "baba adi",
+        "anne adı", "anne adi",
+        "başvuran", "basvuran",
+        "vekil", "temsilci", "ilgili"
     };
 
     private static readonly HashSet<string> NegativeKeywords = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
-        "diyar", "diyarbakÄ±r", "icra", "dairesi", "dairesine", "daire", "esas", "talep", "evrakÄ±", "evraki", "evrak",
-        "takibin", "kesinleÅŸtirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin", "ne", "esas",
-        "ankara", "bÃ¶lge", "mÃ¼dÃ¼rlÃ¼ÄŸÃ¼", "mÃ¼dÃ¼rlÃ¼ÄŸÃ¼", "mÃ¼ÅŸteri", "baÅŸvuru", "formu", "form", "doÄŸum", "tarihi", "kimlik", "no", "ad", "soyad",
-        "ÅŸirket", "kurum", "mahkeme", "belediye", "valilik", "mÃ¼dÃ¼rlÃ¼k", "kurul", "belge", "teknik", "departman"
+        "diyar", "diyarbakır", "diyarbakir", "icra", "dairesi", "dairesine", "daire", "esas", "talep", "evrakı", "evraki", "evrak",
+        "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin", "ne", "esas",
+        "ankara", "bölge", "bolge", "müdürlüğü", "mudurlugu", "müşteri", "musteri", "başvuru", "basvuru", "formu", "form",
+        "doğum", "dogum", "tarihi", "kimlik", "no", "ad", "soyad",
+        "şirket", "sirket", "kurum", "mahkeme", "belediye", "valilik", "müdürlük", "mudurluk", "kurul", "belge", "teknik", "departman"
     };
 
     private readonly ContextAnalyzer _contextAnalyzer = new();
@@ -33,7 +42,6 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
         var results = new List<DetectionModel>();
         var text = normalizedText.Text;
         var matches = NameLikePattern.Matches(text);
-
         foreach (Match match in matches)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -41,35 +49,29 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
             var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (words.Length != 2) continue;
             if (words.Any(w => w.Length < 2)) continue;
-
-            // Check for overlap with existing detections
             var candidateStart = normalizedText.MapToOriginalPosition(match.Index);
             var candidateEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
             var candidateSpan = new TextSpan { StartIndex = candidateStart, Length = candidateEnd - candidateStart, Text = candidate };
-            if (existingDetections.Any(d => d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan)))
+            if (existingDetections.Any(d => d.Type == DetectionType.PossiblePersonalData && d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan)))
                 continue;
-
-            // Negative check
+            if (existingDetections.Any(d => d.Type == DetectionType.FullName && d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan)))
+            {
+                var hasStrongForOverlap = HasStrongContext(ContextWindow.Create(normalizedText.Text, match.Index, match.Length, 120));
+                if (!hasStrongForOverlap) continue;
+            }
             var lowerCandidate = candidate.ToLowerInvariant();
             if (NegativeKeywords.Any(k => lowerCandidate.Contains(k, StringComparison.OrdinalIgnoreCase)))
                 continue;
             if (words.Any(w => NegativeKeywords.Contains(w))) continue;
-
-            // Check field labels alone
             if (IsFieldLabel(candidate)) continue;
-
             var contextWindow = ContextWindow.Create(normalizedText.Text, match.Index, match.Length, 120);
             var hasStrongContext = HasStrongContext(contextWindow);
             var hasProximity = HasPiiProximity(normalizedText, match.Index, match.Length, existingDetections);
-
             if (!(hasStrongContext || hasProximity)) continue;
-
-            // At least two signals required, but we already have NameLike + (Context or Proximity) = 2
             var confidence = 0.55;
             if (hasStrongContext) confidence += 0.05;
             if (hasProximity) confidence += 0.05;
             confidence = Math.Clamp(confidence, 0, 1);
-
             var originalStart = normalizedText.MapToOriginalPosition(match.Index);
             var originalEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
             var textSpan = new TextSpan
@@ -79,8 +81,7 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
                 Text = candidate,
                 BoundingBox = BoundingBox.Empty
             };
-
-            var reason = hasStrongContext ? $"YakÄ±n etiket: \"{GetMatchedLabel(contextWindow)}\" + isim benzeri ifade" : "YakÄ±n kesin PII + isim benzeri ifade";
+            var reason = hasStrongContext ? $"Yakin etiket: \"{GetMatchedLabel(contextWindow)}\" + isim benzeri ifade" : "Yakin kesin PII + isim benzeri ifade";
             var detection = new DetectionModel
             {
                 Type = DetectionType.PossiblePersonalData,
@@ -101,14 +102,13 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
             };
             results.Add(detection);
         }
-
         return results;
     }
 
     private bool IsFieldLabel(string candidate)
     {
         var lower = candidate.ToLowerInvariant();
-        return lower == "doÄŸum tarihi" || lower == "kimlik no" || lower == "ad soyad" || lower == "ad soyadÄ±";
+        return lower == "doğum tarihi" || lower == "dogum tarihi" || lower == "kimlik no" || lower == "ad soyad" || lower == "ad soyadı" || lower == "adi soyadi";
     }
 
     private bool HasStrongContext(ContextWindow window)
@@ -137,10 +137,8 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
             if (det.TextSpan == null) continue;
             var detStart = det.TextSpan.StartIndex;
             var detEnd = detStart + det.TextSpan.Length;
-            // Check if within 200 chars in original coordinates or same TextBlock
             if (Math.Abs(candidateStart - detStart) <= 200 || Math.Abs(candidateEnd - detEnd) <= 200)
                 return true;
-            // Also check same paragraph via PageNumber and proximity in normalized text
             if (Math.Abs(matchIndex - normalizedText.Text.IndexOf(det.Value, StringComparison.OrdinalIgnoreCase)) <= 200)
                 return true;
         }
@@ -152,6 +150,3 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
         return a.StartIndex < b.EndIndex && b.StartIndex < a.EndIndex;
     }
 }
-
-
-

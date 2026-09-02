@@ -94,8 +94,15 @@ public sealed class DetectionEngine : IDetectionEngine
                     foreach (var p in possible)
                     {
                         if (p.TextSpan == null) continue;
-                        if (pageExisting.Any(e => e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!))) continue;
-                        if (possibleDetections.Any(e => e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!))) continue;
+                        bool overlapsFullName = pageExisting.Any(e => e.Type == DetectionType.FullName && e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!));
+                        bool overlapsPossible = pageExisting.Any(e => e.Type == DetectionType.PossiblePersonalData && e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!))
+                            || possibleDetections.Any(e => e.TextSpan != null && SpansOverlap(e.TextSpan!, p.TextSpan!));
+                        if (overlapsPossible) continue;
+                        if (overlapsFullName)
+                        {
+                            var hasStrong = p.Properties.TryGetValue("has_strong_context", out var hs) && hs is true;
+                            if (!hasStrong) continue;
+                        }
                         possibleDetections.Add(p);
                     }
                 }
@@ -256,6 +263,7 @@ public sealed class DetectionEngine : IDetectionEngine
             var overlaps = result
                 .Where(r => r.PageNumber == detection.PageNumber)
                 .Where(r => r.TextSpan != null && detection.TextSpan != null)
+                .Where(r => r.Type != DetectionType.PossiblePersonalData && detection.Type != DetectionType.PossiblePersonalData)
                 .Where(r => SpansOverlap(r.TextSpan!, detection.TextSpan!))
                 .ToList();
 
