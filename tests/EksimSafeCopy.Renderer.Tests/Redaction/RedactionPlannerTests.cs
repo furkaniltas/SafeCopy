@@ -271,7 +271,7 @@ public class RedactionPlannerTests
         var result = _planner.CreatePlan(doc, new[] { d }, options);
         result.IsSuccess.Should().BeTrue();
         result.Value.Operations.Should().HaveCount(1);
-        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+        result.Value.Operations[0].ReplacementText.Should().Be("[OLASI_KİŞİSEL_VERİ]");
         result.Value.Operations[0].DetectionType.Should().Be(DetectionType.PossiblePersonalData);
     }
 
@@ -295,7 +295,7 @@ public class RedactionPlannerTests
         var result = _planner.CreatePlan(doc, new[] { d }, options);
         result.IsSuccess.Should().BeTrue();
         result.Value.Operations.Should().HaveCount(1);
-        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+        result.Value.Operations[0].ReplacementText.Should().Be("[OLASI_KİŞİSEL_VERİ]");
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public class RedactionPlannerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Operations.Should().HaveCount(1);
         result.Value.Operations[0].DetectionType.Should().Be(DetectionType.TesisatNo);
-        result.Value.Operations[0].ReplacementText.Should().NotBe("[POSSIBLE_PII]");
+        result.Value.Operations[0].ReplacementText.Should().NotBe("[OLASI_KİŞİSEL_VERİ]");
     }
 
     [Fact]
@@ -323,7 +323,7 @@ public class RedactionPlannerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Operations.Should().HaveCount(1);
         result.Value.Operations[0].DetectionType.Should().Be(DetectionType.PossiblePersonalData);
-        result.Value.Operations[0].ReplacementText.Should().Be("[POSSIBLE_PII]");
+        result.Value.Operations[0].ReplacementText.Should().Be("[OLASI_KİŞİSEL_VERİ]");
     }
 
     [Fact]
@@ -348,7 +348,7 @@ public class RedactionPlannerTests
         // 6 definitive + 1 possible distinct span = 7 operations
         result.Value.Operations.Should().HaveCount(7);
         result.Value.Operations.Count(o => o.DetectionType == DetectionType.PossiblePersonalData).Should().Be(1);
-        result.Value.Operations.First(o => o.DetectionType == DetectionType.PossiblePersonalData).ReplacementText.Should().Be("[POSSIBLE_PII]");
+        result.Value.Operations.First(o => o.DetectionType == DetectionType.PossiblePersonalData).ReplacementText.Should().Be("[OLASI_KİŞİSEL_VERİ]");
         // Definitive partial outputs unchanged
         result.Value.Operations.First(o => o.DetectionType == DetectionType.TcKimlikNo).ReplacementText.Should().Be("*******8901");
         result.Value.Operations.First(o => o.DetectionType == DetectionType.Phone).ReplacementText.Should().Contain("0555");

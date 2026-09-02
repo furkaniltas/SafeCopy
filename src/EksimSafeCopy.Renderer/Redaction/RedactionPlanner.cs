@@ -64,8 +64,8 @@ public sealed class RedactionPlanner : IRedactionPlanner
                 RedactionStrategy strategyType;
                 if (detection.Type == DetectionType.PossiblePersonalData)
                 {
-                    // PossiblePersonalData: fail-secure, always [POSSIBLE_PII] when selected, for both Full and Partial
-                    replacementText = "[POSSIBLE_PII]";
+                    // PossiblePersonalData: fail-secure, always [OLASI_KİŞİSEL_VERİ] when selected, for both Full and Partial
+                    replacementText = "[OLASI_KİŞİSEL_VERİ]";
                     strategyType = RedactionStrategy.TypeLabel;
                 }
                 else
