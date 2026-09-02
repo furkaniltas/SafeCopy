@@ -140,4 +140,109 @@ public class AddressDetectorTests
         var count = (int)detection.Properties["component_count"];
         count.Should().BeGreaterOrEqualTo(3);
     }
+
+    [Fact]
+    public void Detect_Curated_AyazMah_ReturnsDetection()
+    {
+        var document = CreateDocument("Adres Ayaz Mah. Üzüm Sk. No:108 D:32, Bahçe Kapısı, İç Kapı 74Q, Buca/Manisa");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        var det = result.Value.Where(d => d.Type == DetectionType.Address).ToList();
+        det.Should().NotBeEmpty();
+        det[0].Value.Should().Contain("Ayaz Mah");
+        det[0].TextSpan!.Text.Should().Contain("Ayaz Mah");
+    }
+
+    [Fact]
+    public void Detect_Curated_ZeytinlikMah_ReturnsDetection()
+    {
+        var document = CreateDocument("Fatura adresi Zeytinlik Mah. Derya Sk. No:32 D:28, E Blok, İç Kapı 4EN, Tepebaşı/Antalya");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Address && d.Value.Contains("Zeytinlik Mah"));
+    }
+
+    [Fact]
+    public void Detect_Curated_KoruMah_ReturnsDetection()
+    {
+        var document = CreateDocument("Adres Koru Mah. Ahenk Sk. No:104 D:44, E Blok, İç Kapı JDN, Tepebaşı/Manisa");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Address);
+    }
+
+    [Fact]
+    public void Detect_Curated_BasakMh_Noisy_ReturnsDetection()
+    {
+        var document = CreateDocument("Fatura adresi Başak Mh.Akın S k.No:16 D=68, Arka Giriş, İç Kapı 4CP, Talas/Konya");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().NotBeEmpty();
+        result.Value.First(d => d.Type == DetectionType.Address).Value.Should().Contain("Başak");
+    }
+
+    [Fact]
+    public void Detect_Curated_ElvanMah_ReturnsDetection()
+    {
+        var document = CreateDocument("Adres Elvan Mah. Erguvan Sk. No:50 D:38, 2. Kat, İç Kapı VJ6, Pendik/Manisa");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Address);
+    }
+
+    [Fact]
+    public void Detect_Curated_CamliMah_TurkishChars_ReturnsDetection()
+    {
+        var document = CreateDocument("Bildirim adresi Çamlık Mah. Güvercin Sk. No:57 D:49, 3. Kat, İç Kapı HZZ, Kepez/Sakarya");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.Address && d.Value.Contains("Çamlık Mah"));
+    }
+
+    [Fact]
+    public void Detect_Curated_OptionalComponents_ReturnsDetection()
+    {
+        var document = CreateDocument("Adres Ayaz Mah. Üzüm Sk. No:108 D:32, Bahçe Kapısı, İç Kapı 74Q, Buca/Manisa");
+        var result = _detectionEngine.Detect(document);
+        var det = result.Value.First(d => d.Type == DetectionType.Address);
+        det.Value.Should().Contain("Bahçe Kapısı");
+        det.Value.Should().Contain("İç Kapı");
+        det.Value.Should().Contain("Buca");
+    }
+
+    [Fact]
+    public void Detect_Negative_OrdinarySentence_NotDetected()
+    {
+        var document = CreateDocument("Bugün hava güzel, No: 5 gibi bir şey değil, sadece normal bir cümle.");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Negative_PersonName_NotDetected()
+    {
+        var document = CreateDocument("Ahmet Yılmaz ile görüştüm.");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Negative_Phone_NotDetectedAsAddress()
+    {
+        var document = CreateDocument("Telefon: 0532 123 45 67");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Negative_AccountNumber_NotDetectedAsAddress()
+    {
+        var document = CreateDocument("Hesap: KRT-6545 7568 1468 7417");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_Negative_ServerLog_NotDetected()
+    {
+        var document = CreateDocument("2026-05-17T04:20:12+03:00 api[2960]: action=booking");
+        var result = _detectionEngine.Detect(document);
+        result.Value.Where(d => d.Type == DetectionType.Address).Should().BeEmpty();
+    }
 }

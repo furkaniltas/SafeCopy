@@ -24,6 +24,11 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
         @"\b(?:[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)\s*(?:'|\s+)(?:da|de|ta|te)\s+yaşıyor\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // Curated dataset pattern: handles Mah./Mh./Mahallesi + Sk./S k./Sok. + No:/No./No= + D:/D= + optional suffixes (Bahçe, İç Kapı, Blok, İlçe/İl, Kat)
+    private static readonly Regex CuratedAddressPattern = new(
+        @"\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*\s+(?:Mahalle|Mahallesi|Mah\.|Mh\.|Mh)\s*\.?\s*[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*\s+(?:Sokak|Sok\.|Sk\.|S\s*k\.)\s*(?:No|Numara|Numarası)?\s*[:=\.]?\s*\d+[A-Za-z]?(?:\s*(?:Daire|D)\s*[:=]?\s*\d+)?(?:\s*,\s*(?:\d+\.\s*)?(?:Bahçe Kapısı|Arka Giriş|İç Kapı(?:\s+No)?\s*[A-Z0-9]+|Dış Kapı|Blok|Apt\.?|Kat|E\s*Blok|B\s*Blok|A\s*Blok|C\s*Blok|D\s*Blok|\d+\.\s*Kat))*(?:\s*,\s*[A-ZÇĞİÖŞÜa-zçğıöşü]+\/[A-ZÇĞİÖŞÜa-zçğıöşü]+)?",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly HashSet<string> NegativeAddressKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
         "şirket adresi", "firma adresi", "kurum adresi", "resmi adres",
@@ -36,7 +41,7 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
         var detections = new List<Detection>();
         var text = normalizedText.Text;
 
-        var patterns = new[] { AddressPattern, SimpleAddressPattern, ResidencyPattern };
+        var patterns = new[] { CuratedAddressPattern, AddressPattern, SimpleAddressPattern, ResidencyPattern };
 
         foreach (var pattern in patterns)
         {
@@ -92,14 +97,16 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
     private bool IsValidAddressCandidate(string candidate)
     {
         var lower = candidate.ToLowerInvariant();
+        // Safe normalization for checking variants like Mh.Akın -> Mh. Akın, S k. -> Sk., D= -> D:
+        var norm = lower.Replace("mha", "mh a").Replace("mh.", "mh ").Replace("s k.", "sk.").Replace("s k", "sk ").Replace("d=", "d:").Replace("d :", "d:");
         
         if (NegativeAddressKeywords.Any(k => lower.Contains(k.ToLowerInvariant())))
             return false;
 
-        var hasMahalle = lower.Contains("mahalle") || lower.Contains("mah ") || lower.Contains("mh ") || lower.Contains("mah.");
-        var hasStreet = lower.Contains("caddesi") || lower.Contains("cadde") || lower.Contains("cad ") || lower.Contains("cad.") ||
-                       lower.Contains("sokak") || lower.Contains("sok ") || lower.Contains("sok.") || lower.Contains("sk ") || lower.Contains("sk.");
-        var hasNumber = Regex.IsMatch(candidate, @"\bno\s*\d+|\bnumara\s*\d+|\b:\s*\d+|\s\d{1,4}[A-Za-z]?\b");
+        var hasMahalle = norm.Contains("mahalle") || norm.Contains("mah ") || norm.Contains("mh ") || norm.Contains("mah.");
+        var hasStreet = norm.Contains("caddesi") || norm.Contains("cadde") || norm.Contains("cad ") || norm.Contains("cad.") ||
+                       norm.Contains("sokak") || norm.Contains("sok ") || norm.Contains("sok.") || norm.Contains("sk ") || norm.Contains("sk.");
+        var hasNumber = Regex.IsMatch(candidate, @"\bno\s*[:=\.]?\s*\d+|\bnumara\s*[:=\.]?\s*\d+|\b:\s*\d+|\s\d{1,4}[A-Za-z]?\b", RegexOptions.IgnoreCase);
 
         return hasMahalle && hasStreet && hasNumber;
     }
@@ -108,13 +115,15 @@ public sealed class AddressDetector : BaseDetector, IAddressDetector
     {
         int count = 0;
         var lower = address.ToLowerInvariant();
+        var norm = lower.Replace("mha", "mh a").Replace("mh.", "mh ").Replace("s k.", "sk.").Replace("s k", "sk ").Replace("d=", "d:").Replace("d :", "d:");
         
-        if (lower.Contains("mahalle") || lower.Contains("mah ") || lower.Contains("mh ") || lower.Contains("mah.")) count++;
-        if (lower.Contains("caddesi") || lower.Contains("cadde") || lower.Contains("cad ") || lower.Contains("cad.")) count++;
-        if (lower.Contains("sokak") || lower.Contains("sok ") || lower.Contains("sk ")) count++;
-        if (Regex.IsMatch(lower, @"\bno\s*\d+|\bnumara\s*\d+|\b:\s*\d+")) count++;
-        if (lower.Contains("daire") || lower.Contains("dair") || lower.Contains("d ") || lower.Contains("kat") || lower.Contains("k ")) count++;
+        if (norm.Contains("mahalle") || norm.Contains("mah ") || norm.Contains("mh ") || norm.Contains("mah.")) count++;
+        if (norm.Contains("caddesi") || norm.Contains("cadde") || norm.Contains("cad ") || norm.Contains("cad.")) count++;
+        if (norm.Contains("sokak") || norm.Contains("sok ") || norm.Contains("sk ")) count++;
+        if (Regex.IsMatch(lower, @"\bno\s*[:=\.]?\s*\d+|\bnumara\s*[:=\.]?\s*\d+|\b:\s*\d+", RegexOptions.IgnoreCase)) count++;
+        if (norm.Contains("daire") || norm.Contains("dair") || norm.Contains("d ") || norm.Contains("kat") || norm.Contains("k ")) count++;
         if (lower.Contains("ilçe") || lower.Contains("ilce") || lower.Contains("il ") || Regex.IsMatch(lower, @"\b\d{5}\b")) count++;
+        if (norm.Contains("bahçe kapısı") || norm.Contains("bahce kapisi") || norm.Contains("iç kapı") || norm.Contains("ic kapi") || norm.Contains("arka giriş") || norm.Contains("arka giris") || norm.Contains("blok")) count++;
         
         return count;
     }
