@@ -46,6 +46,19 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin"
     };
 
+    private static readonly HashSet<string> FieldLabels = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
+    {
+        "doğum tarihi", "dogum tarihi",
+        "kimlik no", "kimlik numarası",
+        "ad soyad", "adı soyadı", "adi soyadi", "ad soyadı",
+        "başvuru sahibi", "basvuru sahibi",
+        "müşteri adı", "musteri adi",
+        "ilgili kişi", "ilgili kisi",
+        "yetkili", "yakını", "yakini",
+        "baba adı", "baba adi",
+        "anne adı", "anne adi"
+    };
+
     private static readonly HashSet<string> TurkishTitles = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
     {
         "temsilci", "müdür", "müdürü", "mudur", "muduru", "şef", "sefi", "sef",
@@ -149,6 +162,10 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
 
     private bool IsValidNameCandidate(string candidate)
     {
+        var lower = candidate.ToLower(new System.Globalization.CultureInfo("tr-TR"));
+        if (FieldLabels.Contains(lower)) return false;
+        if (FieldLabels.Contains(candidate)) return false;
+
         var words = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length < 2 || words.Length > 4) return false;
 
@@ -169,6 +186,8 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         
         // Reject if negative keywords appear anywhere (covers kurum/hukuk phrases)
         if (NegativeKeywords.Any(k => candidate.Contains(k, StringComparison.OrdinalIgnoreCase))) return false;
+        // Also reject if field label appears as substring (e.g., "Doğum Tarihi Ahmet" - but candidate is 2-4 words, so check exact)
+        if (FieldLabels.Any(f => lower.Contains(f))) return false;
 
         return true;
     }

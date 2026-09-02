@@ -32,7 +32,8 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
         "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin", "ne", "esas",
         "ankara", "bölge", "bolge", "müdürlüğü", "mudurlugu", "müşteri", "musteri", "başvuru", "basvuru", "formu", "form",
         "doğum", "dogum", "tarihi", "kimlik", "no", "ad", "soyad",
-        "şirket", "sirket", "kurum", "mahkeme", "belediye", "valilik", "müdürlük", "mudurluk", "kurul", "belge", "teknik", "departman"
+        "şirket", "sirket", "kurum", "mahkeme", "belediye", "valilik", "müdürlük", "mudurluk", "kurul", "belge", "teknik", "departman",
+        "çankaya", "cankaya", "mahallesi", "mahalle", "cadde", "caddesi", "sokak", "sokağı", "sokagi", "ataturk", "ataturk", "bilgileri", "islem", "işlem", "müdürlüğü", "bolge", "talep", "dosya", "belge"
     };
 
     private readonly ContextAnalyzer _contextAnalyzer = new();
@@ -54,20 +55,18 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
             var candidateSpan = new TextSpan { StartIndex = candidateStart, Length = candidateEnd - candidateStart, Text = candidate };
             if (existingDetections.Any(d => d.Type == DetectionType.PossiblePersonalData && d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan)))
                 continue;
-            if (existingDetections.Any(d => d.Type == DetectionType.FullName && d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan)))
-            {
-                var hasStrongForOverlap = HasStrongContext(ContextWindow.Create(normalizedText.Text, match.Index, match.Length, 120));
-                if (!hasStrongForOverlap) continue;
-            }
-            var lowerCandidate = candidate.ToLowerInvariant();
-            if (NegativeKeywords.Any(k => lowerCandidate.Contains(k, StringComparison.OrdinalIgnoreCase)))
+            if (existingDetections.Any(d => d.Type == DetectionType.FullName && d.TextSpan != null && SpansOverlap(d.TextSpan!, candidateSpan))) continue;
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            var lowerCandidate = candidate.ToLower(tr);
+            if (NegativeKeywords.Any(k => lowerCandidate.Contains(k.ToLower(tr), StringComparison.OrdinalIgnoreCase)))
                 continue;
             if (words.Any(w => NegativeKeywords.Contains(w))) continue;
             if (IsFieldLabel(candidate)) continue;
             var contextWindow = ContextWindow.Create(normalizedText.Text, match.Index, match.Length, 120);
-            var hasStrongContext = HasStrongContext(contextWindow);
+            var hasStrongContext = HasStrongContextInFullText(normalizedText.Text, contextWindow) || HasStrongContext(contextWindow);
             var hasProximity = HasPiiProximity(normalizedText, match.Index, match.Length, existingDetections);
-            if (!(hasStrongContext || hasProximity)) continue;
+            // Precision hardening: Possible requires StrongPersonalContext, proximity alone is NOT sufficient
+            if (!hasStrongContext) continue;
             var confidence = 0.55;
             if (hasStrongContext) confidence += 0.05;
             if (hasProximity) confidence += 0.05;
@@ -107,14 +106,33 @@ public sealed class PossiblePersonalDataAnalyzer : IPossiblePersonalDataAnalyzer
 
     private bool IsFieldLabel(string candidate)
     {
-        var lower = candidate.ToLowerInvariant();
-        return lower == "doğum tarihi" || lower == "dogum tarihi" || lower == "kimlik no" || lower == "ad soyad" || lower == "ad soyadı" || lower == "adi soyadi";
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lower = candidate.ToLower(tr);
+        return lower == "doğum tarihi" || lower == "dogum tarihi" || lower == "kimlik no" || lower == "ad soyad" || lower == "ad soyadı" || lower == "adi soyadi"
+            || lower == "başvuru sahibi" || lower == "basvuru sahibi"
+            || lower == "müşteri adı" || lower == "musteri adi"
+            || lower == "ilgili kişi" || lower == "ilgili kisi"
+            || lower == "adı soyadı" || lower == "adi soyadi"
+            || lower == "yetkili" || lower == "yakını" || lower == "yakini"
+            || lower == "baba adı" || lower == "baba adi"
+            || lower == "anne adı" || lower == "anne adi"
+            || lower == "çankaya mahallesi" || lower == "cankaya mahallesi"
+            || lower == "işlem bilgileri" || lower == "islem bilgileri"
+            || lower == "ankara bölge müdürlüğü" || lower == "ankara bolge mudurlugu";
     }
 
     private bool HasStrongContext(ContextWindow window)
     {
-        var text = window.FullText.ToLowerInvariant();
-        return PossibleLabels.Any(l => text.Contains(l, StringComparison.OrdinalIgnoreCase));
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var text = window.FullText.ToLower(tr);
+        return PossibleLabels.Any(l => text.Contains(l.ToLower(tr), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool HasStrongContextInFullText(string fullText, ContextWindow window)
+    {
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lowerFull = fullText.ToLower(tr);
+        return PossibleLabels.Any(l => lowerFull.Contains(l.ToLower(tr), StringComparison.OrdinalIgnoreCase));
     }
 
     private string GetMatchedLabel(ContextWindow window)
