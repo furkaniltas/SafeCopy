@@ -13,17 +13,20 @@ public sealed class PhoneNumberDetector : BaseDetector, IPhoneNumberDetector
     public override string Description => "Detects Turkish phone numbers in various formats";
 
     private static readonly Regex MobilePattern = new(
-        @"\b(?:(?:\+?90|0090)[\s\-\.]?)?(?:\(?0?5\d{2}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}\b(?!\s*\d)",
+        @"(?<!\d)(?:(?:\+?90|0090)[\s\-\.]?)?(?:\(?0?5\d{2}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}(?![ \t\-\.]*\d)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex LandlinePattern = new(
-        @"\b(?:(?:\+?90|0090)[\s\-\.]?)?(?:\(?0?\d{3}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}\b",
+        @"(?<!\d)(?:(?:\+?90|0090)[\s\-\.]?)?(?:\(?0?\d{3}\)?[\s\-\.]?)?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}(?![ \t\-\.]*\d)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     protected override IReadOnlyList<Detection> DetectOnPage(DocumentPage page, NormalizedText normalizedText, CancellationToken cancellationToken)
     {
         var detections = new List<Detection>();
-        var text = normalizedText.Text;
+        // Use original page text for phone regex to preserve newlines and avoid collapsing two separate phones on different lines into one line with spaces
+        var text = page.Text;
+        // For position mapping, we need to map original positions via normalizedText
+        // But since we use original text, TextSpan will be in original coordinates directly
 
         var matches = MobilePattern.Matches(text);
         foreach (Match match in matches)
@@ -33,18 +36,15 @@ public sealed class PhoneNumberDetector : BaseDetector, IPhoneNumberDetector
             var candidate = NormalizePhoneNumber(match.Value);
             if (!IsValidMobileNumber(candidate)) continue;
 
-            var contextWindow = GetContextWindow(normalizedText, match.Index, match.Length);
+            var contextWindow = ContextWindow.Create(text, match.Index, match.Length, 100);
             var contextFeatures = AnalyzeContext(contextWindow);
             
             double confidence = CalculateConfidence(candidate, contextFeatures, true);
             
-            var originalStart = normalizedText.MapToOriginalPosition(match.Index);
-            var originalEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
-            
             var textSpan = new TextSpan
             {
-                StartIndex = originalStart,
-                Length = originalEnd - originalStart,
+                StartIndex = match.Index,
+                Length = match.Length,
                 Text = match.Value,
                 BoundingBox = BoundingBox.Empty
             };
@@ -74,18 +74,15 @@ public sealed class PhoneNumberDetector : BaseDetector, IPhoneNumberDetector
             var candidate = NormalizePhoneNumber(match.Value);
             if (!IsValidLandlineNumber(candidate)) continue;
 
-            var contextWindow = GetContextWindow(normalizedText, match.Index, match.Length);
+            var contextWindow = ContextWindow.Create(text, match.Index, match.Length, 100);
             var contextFeatures = AnalyzeContext(contextWindow);
             
             double confidence = CalculateConfidence(candidate, contextFeatures, false);
             
-            var originalStart = normalizedText.MapToOriginalPosition(match.Index);
-            var originalEnd = normalizedText.MapToOriginalPosition(match.Index + match.Length);
-            
             var textSpan = new TextSpan
             {
-                StartIndex = originalStart,
-                Length = originalEnd - originalStart,
+                StartIndex = match.Index,
+                Length = match.Length,
                 Text = match.Value,
                 BoundingBox = BoundingBox.Empty
             };

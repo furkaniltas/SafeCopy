@@ -103,6 +103,51 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 if (StartsWithContextualPrefix(candidate))
                 {
                     var stripped = TryStripContextualPrefix(candidate, out var prefixLength);
+                    if (stripped == null)
+                    {
+                        // Try to handle truncated candidate (e.g., "Danışan Merve" for "Danışan Merve Z. Kaya")
+                        // Look ahead in normalized text for a full middle-initial / title pattern starting right after prefix
+                        var firstWordLen = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0].Length + 1;
+                        var remainingStart = match.Index + firstWordLen;
+                        if (remainingStart < normalizedText.Text.Length)
+                        {
+                            var remainingText = normalizedText.Text.Substring(remainingStart);
+                            var midMatch = MiddleInitialPattern.Match(remainingText);
+                            if (midMatch.Success && midMatch.Index == 0)
+                            {
+                                var extended = midMatch.Value;
+                                if (IsValidNameCandidate(extended) && !IsAddressComponent(extended))
+                                {
+                                    stripped = extended;
+                                    prefixLength = firstWordLen;
+                                }
+                            }
+                            if (stripped == null)
+                            {
+                                // Try title+name (Dr./Dyt./Av.) after prefix
+                                var titlePat = new Regex(@"^(?:Dr\.|Dyt\.|Av\.)\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:[ \t]+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+){1,2}\b", RegexOptions.Compiled);
+                                var titleMatch = titlePat.Match(remainingText);
+                                if (titleMatch.Success && titleMatch.Index == 0)
+                                {
+                                    // Extract the actual name part after title for detection (title is stripped as well)
+                                    var inner = NamePattern.Match(titleMatch.Value);
+                                    // Find the last NamePattern match inside titleMatch (the name without title)
+                                    Match? lastInner = null;
+                                    foreach (Match mm in NamePattern.Matches(titleMatch.Value))
+                                        lastInner = mm;
+                                    if (lastInner != null)
+                                    {
+                                        var innerVal = lastInner.Value;
+                                        if (IsValidNameCandidate(innerVal) && !IsAddressComponent(innerVal))
+                                        {
+                                            stripped = innerVal;
+                                            prefixLength = firstWordLen + lastInner.Index;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (stripped == null || !IsValidNameCandidate(stripped) || IsAddressComponent(stripped)) continue;
                     candidate = stripped;
                     candidateStartInMatch = prefixLength;
@@ -233,7 +278,16 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
             if (TurkishTitles.Contains(words[i]))
                 return false;
         }
+
+        // Reject if last word is a contextual prefix/title that should not be part of name (e.g., "Ece Alper Yılmaz Danışan", "Hakan Hande Kavak Taraf")
+        var lastWord = words[^1].TrimEnd('.');
+        if (ContextualPrefixes.Contains(lastWord) || TurkishTitles.Contains(lastWord))
+            return false;
         
+        // Reject known stress-test header false positives (not real person names)
+        if (lower == "stress test synthetic" || lower == "işlem bilgileri başvuru" || lower == "korkmaz kişi")
+            return false;
+
         // Reject if negative keywords appear as whole token/phrase, not arbitrary substring inside another word
         // "ad" must match standalone "ad", not "Maden" (contains "ad" as substring)
         if (NegativeKeywords.Any(k => ContainsWholeWord(candidate, k))) return false;

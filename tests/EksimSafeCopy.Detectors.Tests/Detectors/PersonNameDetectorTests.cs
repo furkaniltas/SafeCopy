@@ -431,4 +431,34 @@ public class PersonNameDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
     }
+
+    [Theory]
+    [InlineData("Danışan Merve Z. Kaya", "Merve Z. Kaya")]
+    [InlineData("Danışan Aslı S. Bulut'la", "Aslı S. Bulut")]
+    [InlineData("Danışan Dr. Serkan Alkan Ergin", "Serkan Alkan Ergin")]
+    [InlineData("Danışan Dyt. Ece Alper Yılmaz", "Ece Alper Yılmaz")]
+    [InlineData("Danışan Av. Hakan Hande Kavak", "Hakan Hande Kavak")]
+    [InlineData("Hasta Veli G. Uzun", "Veli G. Uzun")]
+    [InlineData("Hasta Kutay T. Başar", "Kutay T. Başar")]
+    [InlineData("Danışan Halil İ. Kurt'dan", "Halil İ. Kurt")]
+    public void Detect_PrefixStripped_MiddleInitialAndTitle_CorrectlyDetected(string text, string expected)
+    {
+        var document = CreateDocument(text);
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == expected);
+    }
+
+    [Theory]
+    [InlineData("Danışan Dyt. Kerem Irmak Korkmaz", "Kerem Irmak Korkmaz")]
+    [InlineData("Danışan Dr. Levent Duran", "Levent Duran")]
+    [InlineData("Danışman Leyla K. Bayraktar", "Leyla K. Bayraktar")]
+    [InlineData("Danışan Buket E. Dikmen'dan", "Buket E. Dikmen")]
+    public void Detect_PrefixStripped_AdditionalG_PrefixCases(string text, string expected)
+    {
+        var document = CreateDocument(text);
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == expected);
+    }
 }

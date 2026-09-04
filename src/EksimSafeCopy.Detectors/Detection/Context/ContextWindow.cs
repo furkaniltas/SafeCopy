@@ -47,7 +47,66 @@ public sealed class ContextWindow
     {
         var beforeContext = GetBeforeContext(maxDistance);
         var afterContext = GetAfterContext(maxDistance);
-        return beforeContext.Contains(label, comparison) || afterContext.Contains(label, comparison);
+        return ContainsWholeWord(beforeContext, label) || ContainsWholeWord(afterContext, label);
+    }
+
+    private static bool ContainsWholeWord(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(label)) return false;
+        // Use word-boundary regex with Turkish-aware case-insensitive check via split
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lowerText = text.ToLower(tr);
+        var lowerLabel = label.ToLower(tr);
+        if (!lowerLabel.Contains(' '))
+        {
+            var words = lowerText.Split(new[] { ' ', '\t', '.', ',', ';', ':', '!', '?', '\n', '\r', '"', '\'', '’', '‘', '(', ')', '-', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var w in words)
+            {
+                var clean = w.TrimEnd('.', ',', ';', ':', '!', '?', '"', '\'', '’', '‘', ')', '(', '-', '/');
+                if (clean == lowerLabel) return true;
+            }
+            return false;
+        }
+        var pattern = $@"\b{System.Text.RegularExpressions.Regex.Escape(lowerLabel)}\b";
+        return System.Text.RegularExpressions.Regex.IsMatch(lowerText, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private static int LastIndexOfWholeWord(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(label)) return -1;
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lowerText = text.ToLower(tr);
+        var lowerLabel = label.ToLower(tr);
+        if (!lowerLabel.Contains(' '))
+        {
+            // Find last whole-word occurrence via word split with positions
+            var words = System.Text.RegularExpressions.Regex.Matches(lowerText, @"\b\w+\b");
+            int lastIdx = -1;
+            foreach (System.Text.RegularExpressions.Match m in words)
+            {
+                if (m.Value == lowerLabel) lastIdx = m.Index;
+            }
+            return lastIdx;
+        }
+        var pattern = $@"\b{System.Text.RegularExpressions.Regex.Escape(lowerLabel)}\b";
+        var matches = System.Text.RegularExpressions.Regex.Matches(lowerText, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (matches.Count == 0) return -1;
+        return matches[^1].Index;
+    }
+
+    private static int IndexOfWholeWord(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(label)) return -1;
+        var tr = new System.Globalization.CultureInfo("tr-TR");
+        var lowerText = text.ToLower(tr);
+        var lowerLabel = label.ToLower(tr);
+        if (!lowerLabel.Contains(' '))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(lowerText, $@"\b{System.Text.RegularExpressions.Regex.Escape(lowerLabel)}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return m.Success ? m.Index : -1;
+        }
+        var match = System.Text.RegularExpressions.Regex.Match(lowerText, $@"\b{System.Text.RegularExpressions.Regex.Escape(lowerLabel)}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Index : -1;
     }
 
     public double GetLabelProximityScore(string label, int maxDistance = 50)
@@ -55,8 +114,8 @@ public sealed class ContextWindow
         var beforeContext = GetBeforeContext(maxDistance);
         var afterContext = GetAfterContext(maxDistance);
         
-        var beforeIndex = beforeContext.LastIndexOf(label, StringComparison.OrdinalIgnoreCase);
-        var afterIndex = afterContext.IndexOf(label, StringComparison.OrdinalIgnoreCase);
+        var beforeIndex = LastIndexOfWholeWord(beforeContext, label);
+        var afterIndex = IndexOfWholeWord(afterContext, label);
         
         if (beforeIndex >= 0)
         {
