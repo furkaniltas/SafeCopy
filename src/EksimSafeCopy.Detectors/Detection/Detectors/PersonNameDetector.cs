@@ -92,9 +92,11 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
 
         foreach (var pattern in allPatterns)
         {
-            var matches = pattern.Matches(text);
-            foreach (Match match in matches)
+            int searchPos = 0;
+            while (searchPos < text.Length)
             {
+                var match = pattern.Match(text, searchPos);
+                if (!match.Success) break;
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 var candidate = match.Value;
@@ -148,7 +150,7 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                             }
                         }
                     }
-                    if (stripped == null || !IsValidNameCandidate(stripped) || IsAddressComponent(stripped)) continue;
+                    if (stripped == null || !IsValidNameCandidate(stripped) || IsAddressComponent(stripped)) { searchPos = match.Index + 1; continue; }
                     candidate = stripped;
                     candidateStartInMatch = prefixLength;
                 }
@@ -165,21 +167,21 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                         }
                         else
                         {
-                            continue;
+                            searchPos = match.Index + 1; continue;
                         }
                     }
-                    if (IsAddressComponent(candidate)) continue;
+                    if (IsAddressComponent(candidate)) { searchPos = match.Index + 1; continue; }
                 }
 
                 var contextWindow = GetContextWindow(normalizedText, match.Index, match.Length);
                 var contextFeatures = AnalyzeContext(contextWindow);
                 
                 if (contextFeatures.HasNegativeLabel)
-                    continue;
+                    { searchPos = match.Index + 1; continue; }
 
                 double confidence = CalculateConfidence(candidate, contextFeatures);
                 
-                if (confidence < ConfidenceThreshold) continue;
+                if (confidence < ConfidenceThreshold) { searchPos = match.Index + 1; continue; }
                 
                 var adjustedIndex = match.Index + candidateStartInMatch;
                 var adjustedLength = candidate.Length;
@@ -209,7 +211,9 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                     });
 
                 detections.Add(detection);
+                searchPos = match.Index + match.Length;
             }
+            // For rejected cases, searchPos was already set before continue, so next iteration starts at next char
         }
 
         // Post-process: if we detected overlapping names, keep the shorter one (more likely to be just the name)
@@ -232,10 +236,11 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
                 continue;
             }
             
-            // Keep the shorter name (more likely to be just the name without title)
+            // For redaction safety, keep the longest span that fully contains shorter fragments (e.g., "Ceren Jale Kalkan Polat" vs "Jale Kalkan")
             var longest = overlaps.MaxBy(o => o.Value.Length);
-            if (longest != null && detection.Value.Length < longest.Value.Length)
+            if (longest != null && detection.Value.Length > longest.Value.Length)
             {
+                // New is longer - keep it for full coverage
                 result.Remove(longest);
                 result.Add(detection);
             }
@@ -243,6 +248,7 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
             {
                 result.Add(detection);
             }
+            // else keep existing longest (do not replace with shorter)
         }
         
         return result;
@@ -276,6 +282,8 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
             // Allow single initial with dot (e.g., B.) even if it's not a title
             if (System.Text.RegularExpressions.Regex.IsMatch(words[i], @"^[A-ZÇĞİÖŞÜ]\.$")) continue;
             if (TurkishTitles.Contains(words[i]))
+                return false;
+            if (ContextualPrefixes.Contains(words[i].TrimEnd('.')))
                 return false;
         }
 

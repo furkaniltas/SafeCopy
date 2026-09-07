@@ -461,4 +461,21 @@ public class PersonNameDetectorTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == expected);
     }
+
+    [Fact]
+    public void Detect_Overlapping_CerenJaleKalkanPolat_CoversCompleteName()
+    {
+        var document = CreateDocument("Taraf Danışman Ceren Jale Kalkan Polat");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        // The 4-word name must be retained as a single FullName, not fragmented into Jale Kalkan / Ceren Polat
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == "Ceren Jale Kalkan Polat");
+        var detection = result.Value.First(d => d.Type == DetectionType.FullName && d.Value == "Ceren Jale Kalkan Polat");
+        detection.TextSpan.Should().NotBeNull();
+        detection.TextSpan!.Text.Should().Be("Ceren Jale Kalkan Polat");
+        // Ensure overlapping shorter fragments do not remain as the only coverage (which would leave Kalkan Polat uncovered)
+        var fullNames = result.Value.Where(d => d.Type == DetectionType.FullName).Select(d => d.Value).ToList();
+        // At least the 4-word should be present; if Jale Kalkan also present, it must overlap and be deduped to the longer
+        fullNames.Should().Contain("Ceren Jale Kalkan Polat");
+    }
 }
