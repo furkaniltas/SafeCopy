@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Eksim SafeCopy" Height="900" Width="1280" MinWidth="1024" MinHeight="700"
+        Title="Eksim SafeCopy" Width="1280" MinWidth="1024" MinHeight="700"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource PageBackground}"
@@ -123,7 +123,7 @@
 
                 <!-- Batch ListView compact - MaxHeight 120 -->
                 <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0">
-                    <ListView ItemsSource="{Binding BatchItems}" BorderThickness="0" MaxHeight="120" MinHeight="60" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListView ItemsSource="{Binding BatchItems}" SelectedItem="{Binding SelectedBatchItem, Mode=TwoWay}" BorderThickness="0" MaxHeight="120" MinHeight="60" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn Header="Dosya" Width="220">
@@ -336,18 +336,48 @@
                         </ListView.ItemContainerStyle>
                     </ListView>
 
-                    <!-- Olası Kişisel Veri -->
-                    <Border Grid.Row="2" Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="0,1,0,1" Padding="12,8" Visibility="{Binding HasPossibleDetections, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <!-- Olası Kişisel Veri — collapsible, default collapsed -->
+                    <Border Grid.Row="2" Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="0,1,0,1" Visibility="{Binding HasPossibleDetections, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="⚠" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="{Binding PossibleCount, StringFormat='Olası Kişisel Veriler ({0})'}" FontWeight="Bold" FontSize="11" Foreground="#92400E" VerticalAlignment="Center"/>
-                                <Border Background="#FEF3C7" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" BorderBrush="#FDE68A" BorderThickness="1">
-                                    <TextBlock Text="{Binding PossibleCount, StringFormat='{}{0}'}" FontSize="10" Foreground="#92400E" FontWeight="SemiBold"/>
-                                </Border>
-                                <TextBlock Text="Medium" FontSize="10" Foreground="#92400E" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                            </StackPanel>
+                            <ToggleButton IsChecked="{Binding IsPossiblePanelExpanded, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Padding="12,8" HorizontalContentAlignment="Stretch" Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock FontSize="10" Foreground="#92400E" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="▶"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+                                                                    <Setter Property="Text" Value="▼"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="⚠" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="{Binding PossibleCount, StringFormat='Olası Kişisel Veriler ({0})'}" FontWeight="Bold" FontSize="11" Foreground="#92400E" VerticalAlignment="Center"/>
+                                                <Border Background="#FEF3C7" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" BorderBrush="#FDE68A" BorderThickness="1">
+                                                    <TextBlock Text="{Binding PossibleCount, StringFormat='{}{0}'}" FontSize="10" Foreground="#92400E" FontWeight="SemiBold"/>
+                                                </Border>
+                                                <TextBlock Text="Medium" FontSize="10" Foreground="#92400E" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
                             <ListView ItemsSource="{Binding PossibleDetections}" SelectedItem="{Binding SelectedDetection}" BorderThickness="0" MaxHeight="120" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
+                                <ListView.Style>
+                                    <Style TargetType="ListView">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsPossiblePanelExpanded}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListView.Style>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Border BorderBrush="#FDE68A" BorderThickness="0,0,0,1" Padding="8,6" Background="#FFFBEB">

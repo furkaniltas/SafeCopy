@@ -59,6 +59,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _batchStatusMessage = "Toplu işlem hazır.";
     private BatchResult? _lastBatchResult;
     private CancellationTokenSource? _batchCts;
+    private BatchItemViewModel? _selectedBatchItem;
 
     public MainViewModel(
         IDocumentEngine documentEngine,
@@ -147,6 +148,24 @@ public sealed class MainViewModel : ViewModelBase
     public int BatchFailedCount => LastBatchResult?.FailedCount ?? BatchItems.Count(x => x.State == BatchItemState.Failed);
     public int BatchUnsupportedCount => LastBatchResult?.UnsupportedCount ?? BatchItems.Count(x => x.State == BatchItemState.Unsupported);
     public int BatchCancelledCount => LastBatchResult?.CancelledCount ?? BatchItems.Count(x => x.State == BatchItemState.Cancelled);
+    public BatchItemViewModel? SelectedBatchItem
+    {
+        get => _selectedBatchItem;
+        set
+        {
+            if (SetProperty(ref _selectedBatchItem, value))
+            {
+                if (value != null)
+                {
+                    // Sync Detail panel to selected batch item's result
+                    VerificationResult = value.VerificationResult;
+                    OutputPath = value.OutputPath;
+                    StatusMessage = value.StatusMessage;
+                }
+            }
+        }
+    }
+
     public int BatchTotalCount => BatchItems.Count;
 
     public bool CanStartBatch => !IsBatchProcessing && !IsBusy && BatchItems.Any(x => x.State == BatchItemState.Queued || x.State == BatchItemState.Failed || x.State == BatchItemState.Cancelled || x.State == BatchItemState.Skipped);
@@ -273,6 +292,12 @@ public sealed class MainViewModel : ViewModelBase
     public IEnumerable<DetectionItemViewModel> PossibleDetections => Detections.Where(d => d.Type == DetectionType.PossiblePersonalData);
     public bool HasPossibleDetections => PossibleDetections.Any();
     public int PossibleCount => PossibleDetections.Count();
+    private bool _isPossiblePanelExpanded = false;
+    public bool IsPossiblePanelExpanded
+    {
+        get => _isPossiblePanelExpanded;
+        set => SetProperty(ref _isPossiblePanelExpanded, value);
+    }
     public IEnumerable<DetectionItemViewModel> DefiniteDetections => Detections.Where(d => d.Type != DetectionType.PossiblePersonalData);
     public bool HasDefiniteDetections => DefiniteDetections.Any();
     public int DefiniteCount => DefiniteDetections.Count();
@@ -470,6 +495,15 @@ public sealed class MainViewModel : ViewModelBase
                 {
                     await LoadAndDetectAsync(firstSuccess.InputPath);
                     SelectedFilePath = firstSuccess.InputPath;
+                    var vm = BatchItems.FirstOrDefault(x => string.Equals(x.InputPath, firstSuccess.InputPath, StringComparison.OrdinalIgnoreCase));
+                    if (vm != null)
+                    {
+                        SelectedBatchItem = vm;
+                        // Override the single-file VerificationResult (null) with the batch's actual verification
+                        VerificationResult = firstSuccess.VerificationResult;
+                        OutputPath = firstSuccess.OutputPath;
+                        StatusMessage = vm.StatusMessage;
+                    }
                 }).ConfigureAwait(false);
             }
 
