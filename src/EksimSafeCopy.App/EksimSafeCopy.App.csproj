@@ -10,6 +10,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>1591</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Icons\EksimSafeCopy.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,5 +24,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\test.jsonl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Icons\EksimSafeCopy.ico" />
   </ItemGroup>
 </Project>

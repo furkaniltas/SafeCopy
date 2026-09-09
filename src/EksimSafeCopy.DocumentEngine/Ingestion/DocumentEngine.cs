@@ -109,6 +109,15 @@ public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
     }
     public Result<DocumentFormat> DetectFormat(string filePath)
     {
+        // Handle double extension .udf.zip before Path.GetExtension
+        if (filePath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+        {
+            var zipFormat = _securityValidator.IdentifyZipBasedFormat(filePath);
+            if (zipFormat != DocumentFormat.Unknown)
+                return Result<DocumentFormat>.Success(zipFormat);
+            // Fallback to Udf if ZIP inspection fails but extension suggests it
+            return Result<DocumentFormat>.Success(DocumentFormat.Udf);
+        }
         var extension = Path.GetExtension(filePath).ToLowerInvariant();
         var format = extension switch
         {
@@ -117,6 +126,7 @@ public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
             ".xlsx" => DocumentFormat.Xlsx,
             ".txt" => DocumentFormat.Txt,
             ".udf" => DocumentFormat.Udf,
+            ".zip" => DocumentFormat.Unknown, // delegate to ZIP inspection
             ".png" => DocumentFormat.Png,
             ".jpg" or ".jpeg" => DocumentFormat.Jpeg,
             ".tiff" or ".tif" => DocumentFormat.Tiff,
@@ -184,6 +194,11 @@ public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
     }
     private IDocumentIngestor? GetIngestorForFile(string filePath)
     {
+        if (filePath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+        {
+            var udfIngestor = _ingestors.FirstOrDefault(i => i.SupportedFormat == DocumentFormat.Udf);
+            if (udfIngestor != null) return udfIngestor;
+        }
         var extension = Path.GetExtension(filePath).ToLowerInvariant();
         return _ingestors.FirstOrDefault(i => i.SupportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase));
     }
@@ -193,6 +208,8 @@ public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
     }
     private DocumentFormat DetectFormatFromExtension(string filePath)
     {
+        if (filePath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+            return DocumentFormat.Udf;
         var extension = Path.GetExtension(filePath).ToLowerInvariant();
         return extension switch
         {
@@ -201,6 +218,7 @@ public sealed class DocumentEngine : IDocumentEngine, IDocumentIngestionEngine
             ".xlsx" => DocumentFormat.Xlsx,
             ".txt" => DocumentFormat.Txt,
             ".udf" => DocumentFormat.Udf,
+            ".zip" => DocumentFormat.Unknown,
             ".png" => DocumentFormat.Png,
             ".jpg" or ".jpeg" => DocumentFormat.Jpeg,
             ".tiff" or ".tif" => DocumentFormat.Tiff,

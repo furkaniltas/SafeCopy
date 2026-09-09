@@ -675,4 +675,64 @@ public class XlsxRedactorTests
         if (inline != null) return inline.InnerText;
         return cell.CellValue?.Text ?? "";
     }
+
+    [Fact]
+    public void Redact_XlsxMetadata_Sanitized()
+    {
+        // Create XLSX with PII-bearing metadata (Creator/LastModifiedBy as in turkce_pii_test_verisi.xlsx)
+        var tempFile = Path.Combine(Path.GetTempPath(), $"meta_{Guid.NewGuid():N}.xlsx");
+        using (var doc = SpreadsheetDocument.Create(tempFile, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+        {
+            var wbPart = doc.AddWorkbookPart();
+            wbPart.Workbook = new Workbook();
+            var wsPart = wbPart.AddNewPart<WorksheetPart>();
+            wsPart.Worksheet = new Worksheet(new SheetData());
+            var sheets = wbPart.Workbook.AppendChild(new Sheets());
+            sheets.Append(new Sheet { Id = wbPart.GetIdOfPart(wsPart), SheetId = 1, Name = "Sheet1" });
+            var sd = wsPart.Worksheet.GetFirstChild<SheetData>()!;
+            var row = new Row { RowIndex = 1 };
+            row.Append(new Cell { CellReference = "A1", CellValue = new CellValue("Test"), DataType = CellValues.String });
+            sd.Append(row);
+            wbPart.Workbook.Save();
+            // Set core properties with PII
+            doc.PackageProperties.Creator = "Furkan";
+            doc.PackageProperties.LastModifiedBy = "Furkan";
+            doc.PackageProperties.Title = "PII Title";
+            doc.PackageProperties.Subject = "PII Subject";
+        }
+
+        try
+        {
+            var plan = CreatePlan(tempFile);
+            var result = _redactor.Redact(File.ReadAllBytes(tempFile), plan, new RenderOptions());
+            result.IsSuccess.Should().BeTrue();
+            var outPath = Path.Combine(Path.GetTempPath(), $"meta_out_{Guid.NewGuid():N}.xlsx");
+            File.WriteAllBytes(outPath, result.Value);
+            try
+            {
+                using var outDoc = SpreadsheetDocument.Open(outPath, false);
+                outDoc.PackageProperties.Creator.Should().BeNullOrEmpty("Creator must be sanitized");
+                outDoc.PackageProperties.LastModifiedBy.Should().BeNullOrEmpty("LastModifiedBy must be sanitized");
+                (outDoc.PackageProperties.Title == null || string.IsNullOrEmpty(outDoc.PackageProperties.Title)).Should().BeTrue("Title must be sanitized");
+                // Verify via engine
+                var services = new ServiceCollection();
+                services.AddSingleton(new DocumentSecurityOptions());
+                services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
+                services.AddSingleton<IFileSystem, FileSystem>();
+                services.AddSingleton<IDocumentIngestor, EksimSafeCopy.DocumentEngine.Ingestion.Xlsx.XlsxDocumentIngestor>();
+                services.AddSingleton<IDocumentEngine, EksimSafeCopy.DocumentEngine.Ingestion.DocumentEngine>();
+                services.AddDetectors();
+                services.AddRenderer();
+                var prov = services.BuildServiceProvider();
+                var verifier = prov.GetRequiredService<IVerificationEngine>();
+                var verify = verifier.Verify(outPath, DF.Xlsx);
+                verify.IsSuccess.Should().BeTrue();
+                verify.Value.Passed.Should().BeTrue("Metadata sanitized, so verification must pass");
+                verify.Value.MetadataIssues.Should().BeEmpty();
+                verify.Value.TotalResidualCount.Should().Be(0);
+            }
+            finally { if (File.Exists(outPath)) File.Delete(outPath); }
+        }
+        finally { File.Delete(tempFile); }
+    }
 }

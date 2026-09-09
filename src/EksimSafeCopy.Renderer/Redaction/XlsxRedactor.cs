@@ -142,11 +142,36 @@ public sealed class XlsxRedactor : IRedactor
                 }
             }
 
-            // Sanitize custom properties if any
-            if (workbookPart.Workbook.WorkbookProperties != null)
+            // Sanitize metadata - clear all PII-bearing core and extended properties (mirrors DocxRedactor)
+            try
             {
-                // No direct PII in workbook properties typically, but ensure no custom
+                var props = document.PackageProperties;
+                props.Creator = string.Empty;
+                props.LastModifiedBy = string.Empty;
+                props.Title = string.Empty;
+                props.Subject = string.Empty;
+                props.Keywords = string.Empty;
+                props.Description = string.Empty;
+                props.Category = string.Empty;
+                props.ContentStatus = string.Empty;
+                props.Revision = string.Empty;
+                props.Version = string.Empty;
+                // Remove custom properties part if exists
+                if (document.CustomFilePropertiesPart != null)
+                    document.DeletePart(document.CustomFilePropertiesPart);
+                if (document.ExtendedFilePropertiesPart != null)
+                {
+                    var extProps = document.ExtendedFilePropertiesPart.Properties;
+                    if (extProps != null)
+                    {
+                        var company = extProps.GetFirstChild<global::DocumentFormat.OpenXml.ExtendedProperties.Company>();
+                        if (company != null) company.Text = string.Empty;
+                        var manager = extProps.GetFirstChild<global::DocumentFormat.OpenXml.ExtendedProperties.Manager>();
+                        if (manager != null) manager.Text = string.Empty;
+                    }
+                }
             }
+            catch { /* best effort */ }
 
             workbookPart.Workbook.Save();
             document.Save();

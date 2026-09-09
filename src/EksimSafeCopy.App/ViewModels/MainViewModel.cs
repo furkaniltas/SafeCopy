@@ -852,17 +852,15 @@ public sealed class MainViewModel : ViewModelBase
             // Update preview with bbox markers using CoordinateSystem
             await UpdatePreviewWithMarkersAsync(document, detections, token).ConfigureAwait(false);
 
-            // Handle unsupported formats already flagged for redaction
-            if (document.Format == DF.Pdf || document.Format == DF.Udf)
+            // Handle unsupported formats already flagged for redaction (UDF now supported via UdfRedactor FAZ 8.1)
+            if (document.Format == DF.Pdf)
             {
                 if (detections.Any())
                 {
                     await RunOnUiAsync(() =>
                     {
                         ProcessingState = ProcessingState.Unsupported;
-                        UnsupportedMessage = document.Format == DF.Pdf
-                            ? "PDF redaction şu anda güvenli olarak desteklenmiyor."
-                            : "UDF redaction şu anda güvenli olarak desteklenmiyor.";
+                        UnsupportedMessage = "PDF redaction şu anda güvenli olarak desteklenmiyor.";
                         StatusMessage = UnsupportedMessage + " Dosya güvenli şekilde maskelenemedi, çıktı oluşturulmadı.";
                     }).ConfigureAwait(false);
                     return;
@@ -918,13 +916,11 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
-        // Unsupported format check - mandatory security rule
-        if (CurrentDocument.Format == DF.Pdf || CurrentDocument.Format == DF.Udf)
+        // Unsupported format check - mandatory security rule (PDF only, UDF now supported FAZ 8.1)
+        if (CurrentDocument.Format == DF.Pdf)
         {
             ProcessingState = ProcessingState.Unsupported;
-            var msg = CurrentDocument.Format == DF.Pdf
-                ? "PDF redaction şu anda güvenli olarak desteklenmiyor."
-                : "UDF redaction şu anda güvenli olarak desteklenmiyor.";
+            var msg = "PDF redaction şu anda güvenli olarak desteklenmiyor.";
             UnsupportedMessage = msg;
             StatusMessage = msg + " Güvenli çıktı oluşturulmadı.";
             VerificationResult = null;
@@ -960,11 +956,20 @@ public sealed class MainViewModel : ViewModelBase
                 RemoveHiddenContent = true
             };
 
-            // Resolve output path
+            // Resolve output path - preserve .udf.zip double extension
             var dir = Path.GetDirectoryName(SelectedFilePath)!;
-            var nameWithoutExt = Path.GetFileNameWithoutExtension(SelectedFilePath);
-            var ext = Path.GetExtension(SelectedFilePath);
-            var outputFileName = $"{nameWithoutExt}_SafeCopy{ext}";
+            string outputFileName;
+            if (SelectedFilePath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+            {
+                var baseName = Path.GetFileName(SelectedFilePath)[..^".udf.zip".Length];
+                outputFileName = $"{baseName}_SafeCopy.udf.zip";
+            }
+            else
+            {
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(SelectedFilePath);
+                var ext = Path.GetExtension(SelectedFilePath);
+                outputFileName = $"{nameWithoutExt}_SafeCopy{ext}";
+            }
             var outputPath = Path.Combine(dir, outputFileName);
 
             // Optional: ask user for save location? For automated flow use auto path.

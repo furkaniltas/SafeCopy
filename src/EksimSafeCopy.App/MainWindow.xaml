@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Eksim SafeCopy" Width="1280" MinWidth="1024" MinHeight="700"
+        Icon="Assets/Icons/EksimSafeCopy.ico"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource PageBackground}"

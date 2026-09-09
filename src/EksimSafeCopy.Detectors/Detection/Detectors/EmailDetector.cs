@@ -13,7 +13,7 @@ public sealed class EmailDetector : BaseDetector, IEmailDetector
     public override string Description => "Detects email addresses in various formats";
 
     private static readonly Regex EmailPattern = new(
-        @"(?<!\.)\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+        @"(?<!\.)\b[\p{L}0-9._%+-]+@[\p{L}0-9.-]+\.[\p{L}]{2,}\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     protected override IReadOnlyList<Detection> DetectOnPage(DocumentPage page, NormalizedText normalizedText, CancellationToken cancellationToken)

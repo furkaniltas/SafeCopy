@@ -10,7 +10,7 @@ using System.Xml.Linq;
 public sealed class UdfDocumentIngestor : DocumentIngestorBase
 {
     public override DocumentFormat SupportedFormat => DocumentFormat.Udf;
-    public override string[] SupportedExtensions => new[] { ".udf" };
+    public override string[] SupportedExtensions => new[] { ".udf", ".udf.zip", ".zip" };
 
     public UdfDocumentIngestor(IDocumentSecurityValidator securityValidator, IFileSystem fileSystem)
         : base(securityValidator, fileSystem) { }
@@ -169,13 +169,58 @@ public sealed class UdfDocumentIngestor : DocumentIngestorBase
             }
         }
 
-        // Fallback: get all text from the entire document
+        // Real UYAP UDF uses <template><content><![CDATA[ ... ]]></content></template>
         if (!allText.Any())
         {
-            var allTextContent = xdoc.Descendants().Select(e => e.Value).Where(t => !string.IsNullOrWhiteSpace(t));
-            foreach (var text in allTextContent)
+            var contentElement = root?.Element("content")
+                ?? root?.Descendants().FirstOrDefault(e => e.Name.LocalName == "content");
+            if (contentElement != null)
             {
-                if (string.IsNullOrWhiteSpace(text)) continue;
+                var raw = contentElement.Value ?? string.Empty;
+                // Split CDATA by lines, preserve non-empty lines as blocks
+                var lines = raw.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                    .Select(l => l.Trim())
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .ToList();
+                if (lines.Count > 0)
+                {
+                    // Use full raw trimmed text for DocumentPage.Text (preserves original formatting for detection)
+                    var fullText = raw.Trim();
+                    allText.Add(fullText);
+                    foreach (var line in lines)
+                    {
+                        var block = new TextBlock
+                        {
+                            Text = line,
+                            Type = TextBlockType.Paragraph,
+                            Direction = global::EksimSafeCopy.Core.Models.TextDirection.LeftToRight,
+                            OrderIndex = textBlocks.Count,
+                            PageNumber = 1,
+                            BoundingBox = BoundingBox.Empty
+                        };
+                        textBlocks.Add(block);
+                    }
+                }
+            }
+        }
+
+        // Fallback: get all leaf text from the entire document (avoid duplicate parent Values)
+        if (!allText.Any())
+        {
+            var leafTexts = xdoc.Descendants()
+                .Where(e => !e.HasElements)
+                .Select(e => e.Value.Trim())
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct()
+                .ToList();
+
+            // If still empty, fall back to root value (e.g., single text node)
+            if (!leafTexts.Any() && root != null && !string.IsNullOrWhiteSpace(root.Value))
+                leafTexts.Add(root.Value.Trim());
+
+            foreach (var text in leafTexts)
+            {
+                allText.Add(text);
                 var block = new TextBlock
                 {
                     Text = text,

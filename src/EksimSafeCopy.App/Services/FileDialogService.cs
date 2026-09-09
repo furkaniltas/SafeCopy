@@ -5,12 +5,12 @@ namespace EksimSafeCopy.App.Services;
 public sealed class FileDialogService : IFileDialogService
 {
     private const string DefaultFilter =
-        "Desteklenen Dosyalar|*.pdf;*.docx;*.xlsx;*.txt;*.udf;*.png;*.jpg;*.jpeg;*.tiff;*.tif;*.bmp|" +
+        "Desteklenen Dosyalar|*.pdf;*.docx;*.xlsx;*.txt;*.udf;*.udf.zip;*.png;*.jpg;*.jpeg;*.tiff;*.tif;*.bmp|" +
         "PDF Dosyaları (*.pdf)|*.pdf|" +
         "Word Belgeleri (*.docx)|*.docx|" +
         "Excel Çalışma Kitapları (*.xlsx)|*.xlsx|" +
         "Metin Dosyaları (*.txt)|*.txt|" +
-        "UDF Dosyaları (*.udf)|*.udf|" +
+        "UDF Dosyaları (*.udf;*.udf.zip)|*.udf;*.udf.zip|" +
         "Görüntü Dosyaları (*.png;*.jpg;*.jpeg;*.tiff;*.bmp)|*.png;*.jpg;*.jpeg;*.tiff;*.tif;*.bmp|" +
         "Tüm Dosyalar (*.*)|*.*";
 

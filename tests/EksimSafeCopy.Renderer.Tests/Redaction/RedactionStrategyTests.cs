@@ -149,4 +149,69 @@ public class RedactionStrategyTests
         result.Value.Operations[0].ReplacementText.Should().Be("[TC_KIMLIK_NO]");
         result.Value.Operations[0].Strategy.Should().Be(RedactionStrategy.TypeLabel);
     }
+
+    // Password/Secret PartialMask must be fully hidden - regression tests
+    [Theory]
+    [InlineData("abc123_Se&")]
+    [InlineData("P@ssw0rd!2024")]
+    [InlineData("MySecret123#90C")]
+    public void PartialMaskingPolicy_Secret_FullyHidden(string secret)
+    {
+        var strategy = new PartialMaskStrategy();
+        var options = new RenderOptions();
+        var masked = strategy.GetReplacementText(DetectionType.Secret, secret, options);
+        masked.Should().Be("[SECRET]");
+        masked.Should().NotContain(secret);
+        foreach (var sub in GetSubstrings(secret, 3))
+        {
+            if (sub.Any(char.IsLetterOrDigit))
+                masked.Should().NotContain(sub);
+        }
+    }
+
+    [Fact]
+    public void PartialMaskingPolicy_Secret_FullMaskPlaceholder()
+    {
+        var strategy = new DefaultRedactionStrategy();
+        var options = new RenderOptions { UseTypePlaceholder = true };
+        strategy.GetReplacementText(DetectionType.Secret, options).Should().Be("[SECRET]");
+    }
+
+    [Fact]
+    public void PartialMaskingPolicy_Address_PartialStillFullPlaceholder()
+    {
+        var strategy = new PartialMaskStrategy();
+        var options = new RenderOptions();
+        var masked = strategy.GetReplacementText(DetectionType.Address, "Yıldız Mah. Çınar Sokak No: 117 Daire: 12, Trabzon", options);
+        masked.Should().Be("[ADDRESS]");
+    }
+
+    [Fact]
+    public void PartialMaskingPolicy_Email_PreservesDomain()
+    {
+        var strategy = new PartialMaskStrategy();
+        var options = new RenderOptions();
+        var masked = strategy.GetReplacementText(DetectionType.Email, "ahmet.yilmaz@example.com", options);
+        masked.Should().Contain("@example.com");
+        masked.Should().NotContain("ahmet.yilmaz");
+        masked.Should().Be("a***********@example.com");
+    }
+
+    [Fact]
+    public void PartialMaskingPolicy_Phone_PreservesFormatting()
+    {
+        var strategy = new PartialMaskStrategy();
+        var options = new RenderOptions();
+        var masked = strategy.GetReplacementText(DetectionType.Phone, "0532 123 45 67", options);
+        masked.Should().Contain("0532");
+        masked.Should().Contain("67");
+        masked.Should().Contain("*");
+    }
+
+    private static IEnumerable<string> GetSubstrings(string s, int minLen)
+    {
+        for (int i = 0; i <= s.Length - minLen; i++)
+            for (int len = minLen; len <= s.Length - i; len++)
+                yield return s.Substring(i, len);
+    }
 }

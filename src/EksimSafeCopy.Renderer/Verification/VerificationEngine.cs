@@ -232,6 +232,7 @@ private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocume
         services.AddSingleton<IAddressDetector, EksimSafeCopy.Detectors.Detection.Detectors.AddressDetector>();
         services.AddSingleton<IInstallationNumberDetector, EksimSafeCopy.Detectors.Detection.Detectors.InstallationNumberDetector>();
         services.AddSingleton<IIbanDetector, EksimSafeCopy.Detectors.Detection.Detectors.IbanDetector>();
+        services.AddSingleton<IXlsxStructuredDetector, EksimSafeCopy.Detectors.Detection.Detectors.XlsxStructuredDetector>();
 
         services.AddSingleton<IReadOnlyList<IDetector>>(sp =>
         {
@@ -244,7 +245,8 @@ private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocume
                 sp.GetRequiredService<IPersonNameDetector>(),
                 sp.GetRequiredService<IAddressDetector>(),
                 sp.GetRequiredService<IInstallationNumberDetector>(),
-                sp.GetRequiredService<IIbanDetector>()
+                sp.GetRequiredService<IIbanDetector>(),
+                sp.GetRequiredService<IXlsxStructuredDetector>()
             }.AsReadOnly();
         });
 
@@ -294,8 +296,11 @@ private Result<(Document Document, IDetectionEngine DetectionEngine)> LoadDocume
         if (!string.IsNullOrWhiteSpace(document.Metadata.Producer))
             issues.Add("Producer metadata may contain PII");
 
+        // UDF safe metadata (Format/Parser etc. are not PII, always present even in original)
+        var safeCustomKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Format", "Parser", "HasDigitalSignature", "SignatureFile" };
         foreach (var kvp in document.Metadata.CustomProperties)
         {
+            if (safeCustomKeys.Contains(kvp.Key)) continue;
             issues.Add($"Custom property '{kvp.Key}' may contain PII");
         }
 

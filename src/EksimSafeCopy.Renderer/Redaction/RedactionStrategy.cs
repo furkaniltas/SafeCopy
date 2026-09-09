@@ -85,12 +85,14 @@ internal static class PartialMaskingPolicy
             DetectionType.Phone => MaskPhone(value),
             DetectionType.Iban => MaskIban(value),
             DetectionType.TesisatNo or DetectionType.AboneNo or DetectionType.SayacNo or DetectionType.MusteriNo or DetectionType.DosyaNo or DetectionType.DavaNo => MaskInstallationNumber(value),
-            DetectionType.FullName => MaskFullName(value),
-            DetectionType.Date => MaskDate(value),
-            DetectionType.TaxId => MaskTaxId(value),
+            DetectionType.FullName or DetectionType.FirstName or DetectionType.LastName or DetectionType.MotherName or DetectionType.FatherName => MaskFullName(value),
+            DetectionType.Date or DetectionType.CardExpiry => MaskDate(value),
+            DetectionType.TaxId or DetectionType.SgkNo => MaskTaxId(value),
             DetectionType.CreditCard => MaskCreditCard(value),
             DetectionType.Email => MaskEmail(value),
             DetectionType.Address => MaskAddress(value),
+            DetectionType.Secret => MaskSecret(value),
+            DetectionType.Username or DetectionType.Cvv or DetectionType.BloodType or DetectionType.IpAddress or DetectionType.MacAddress or DetectionType.LicensePlate => MaskGeneric(value),
             _ => MaskGeneric(value)
         };
     }
@@ -228,6 +230,12 @@ internal static class PartialMaskingPolicy
     {
         // For address, mask with placeholder as it's free text and hard to partially mask securely
         return "[ADDRESS]";
+    }
+
+    private static string MaskSecret(string v)
+    {
+        // Password/Secret must be fully hidden even in PartialMask, never show any original characters
+        return "[SECRET]";
     }
 
     private static string MaskGeneric(string v)

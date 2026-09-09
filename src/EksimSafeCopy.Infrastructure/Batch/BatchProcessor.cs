@@ -445,8 +445,8 @@ void Report(BatchItemState state, string message, Error? err = null, string? out
             }
             detections = detectResult.Value;
 
-            // 7. PDF/UDF secure-failure: if Pdf/Udf with detections.Any() => mark Unsupported
-            if ((detectedFormat == DocumentFormat.Pdf || detectedFormat == DocumentFormat.Udf) && detections.Any())
+            // 7. PDF secure-failure: UDF now supported via UdfRedactor (FAZ 8.1)
+            if (detectedFormat == DocumentFormat.Pdf && detections.Any())
             {
                 sw.Stop();
                 var err = Error.SecurityError($"{detectedFormat} redaction is not securely supported. No output generated.");
@@ -476,12 +476,21 @@ void Report(BatchItemState state, string message, Error? err = null, string? out
             // Simplest: if no detections, skip render and consider Success with no output? But spec says Success with OutputPath.
             // We'll treat zero detections as Success with output being copy of original as SafeCopy (sanitized via renderer when possible, else fallback copy).
 
-            // Determine output path: inputDir/input_SafeCopy.ext
+            // Determine output path: preserve .udf.zip double extension
             var dir = Path.GetDirectoryName(inputPath);
             if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
-            var nameWithoutExt = Path.GetFileNameWithoutExtension(inputPath);
-            var ext = Path.GetExtension(inputPath);
-            var baseOutputName = $"{nameWithoutExt}_SafeCopy{ext}";
+            string baseOutputName;
+            if (inputPath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+            {
+                var baseName = Path.GetFileName(inputPath)[..^".udf.zip".Length];
+                baseOutputName = $"{baseName}_SafeCopy.udf.zip";
+            }
+            else
+            {
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(inputPath);
+                var ext = Path.GetExtension(inputPath);
+                baseOutputName = $"{nameWithoutExt}_SafeCopy{ext}";
+            }
             outputPath = Path.Combine(dir, baseOutputName);
             // Ensure not overwriting: if exists, create unique suffix
             outputPath = GetUniqueOutputPath(outputPath);
@@ -788,8 +797,18 @@ void Report(BatchItemState state, string message, Error? err = null, string? out
     {
         if (!File.Exists(initialPath)) return initialPath;
         var dir = Path.GetDirectoryName(initialPath)!;
-        var name = Path.GetFileNameWithoutExtension(initialPath);
-        var ext = Path.GetExtension(initialPath);
+        string name;
+        string ext;
+        if (initialPath.EndsWith(".udf.zip", StringComparison.OrdinalIgnoreCase))
+        {
+            name = Path.GetFileName(initialPath)[..^".udf.zip".Length];
+            ext = ".udf.zip";
+        }
+        else
+        {
+            name = Path.GetFileNameWithoutExtension(initialPath);
+            ext = Path.GetExtension(initialPath);
+        }
         for (int i = 1; i < 1000; i++)
         {
             var candidate = Path.Combine(dir, $"{name}_{i}{ext}");

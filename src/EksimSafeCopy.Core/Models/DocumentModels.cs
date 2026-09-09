@@ -622,7 +622,19 @@ public enum DetectionType
     IpAddress,
     Url,
     PossiblePersonalData,
-    Custom
+    Custom,
+    // XLSX structured field types (column-semantic)
+    FirstName,
+    LastName,
+    MotherName,
+    FatherName,
+    Username,
+    Secret,
+    CardExpiry,
+    Cvv,
+    BloodType,
+    MacAddress,
+    SgkNo
 }
 
 public enum ConfidenceLevel
@@ -680,6 +692,17 @@ public sealed class RenderOptions
         { DetectionType.TaxId, "[TAX_ID]" },
         { DetectionType.PassportNo, "[PASSPORT]" },
         { DetectionType.LicensePlate, "[PLATE]" },
+        { DetectionType.FirstName, "[FIRST_NAME]" },
+        { DetectionType.LastName, "[LAST_NAME]" },
+        { DetectionType.MotherName, "[MOTHER_NAME]" },
+        { DetectionType.FatherName, "[FATHER_NAME]" },
+        { DetectionType.Username, "[USERNAME]" },
+        { DetectionType.Secret, "[SECRET]" },
+        { DetectionType.CardExpiry, "[CARD_EXPIRY]" },
+        { DetectionType.Cvv, "[CVV]" },
+        { DetectionType.BloodType, "[BLOOD_TYPE]" },
+        { DetectionType.MacAddress, "[MAC_ADDRESS]" },
+        { DetectionType.SgkNo, "[SGK_NO]" },
     };
 }
 

@@ -153,7 +153,7 @@ public class MainViewModelTests
     [Fact]
     public async Task UnsupportedUdf_WithPII_BlocksRedact()
     {
-        // Create minimal UDF-like zip with content.xml
+        // FAZ 8.1: UDF now supported via UdfRedactor, should go to Ready not Unsupported
         var tmp = Path.Combine(Path.GetTempPath(), $"app_test_{Guid.NewGuid():N}.udf");
         CreateUdf(tmp, "Ahmet Yılmaz TC 10000000146");
         try
@@ -162,9 +162,9 @@ public class MainViewModelTests
             await vm.LoadAndDetectAsync(tmp);
             if (vm.Detections.Any())
             {
-                vm.ProcessingState.Should().Be(ProcessingState.Unsupported);
-                vm.UnsupportedMessage.Should().Contain("UDF");
-                vm.CanRedact.Should().BeFalse();
+                vm.ProcessingState.Should().Be(ProcessingState.Ready);
+                (vm.UnsupportedMessage == null || !vm.UnsupportedMessage.Contains("UDF")).Should().BeTrue();
+                vm.CanRedact.Should().BeTrue();
             }
         }
         finally { File.Delete(tmp); }

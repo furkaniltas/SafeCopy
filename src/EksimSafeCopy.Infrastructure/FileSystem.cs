@@ -41,6 +41,17 @@ public sealed class FileSystem : IFileSystem
     {
         try
         {
+            if (Directory.Exists(path) && path.EndsWith(".udf", StringComparison.OrdinalIgnoreCase))
+            {
+                var contentPath = Path.Combine(path, "content.xml");
+                if (!File.Exists(contentPath))
+                    contentPath = Path.Combine(path, "content");
+                if (File.Exists(contentPath))
+                    return Result<long>.Success(new FileInfo(contentPath).Length);
+                // Fallback: sum directory size
+                var total = Directory.GetFiles(path, "*", System.IO.SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
+                return Result<long>.Success(total);
+            }
             if (!File.Exists(path)) return Result<long>.Failure(Error.NotFound($"File not found: {path}"));
             return Result<long>.Success(new FileInfo(path).Length);
         }
@@ -61,6 +72,34 @@ public sealed class FileSystem : IFileSystem
     {
         try
         {
+            if (Directory.Exists(path) && path.EndsWith(".udf", StringComparison.OrdinalIgnoreCase))
+            {
+                var contentPath = Path.Combine(path, "content.xml");
+                if (!File.Exists(contentPath))
+                    contentPath = Path.Combine(path, "content");
+                if (File.Exists(contentPath))
+                    path = contentPath;
+                else if (Directory.Exists(path))
+                {
+                    // Hash directory listing as fallback
+                    using var hasher2 = algorithm switch
+                    {
+                        CoreHashAlgorithm.SHA256 => (System.Security.Cryptography.HashAlgorithm)System.Security.Cryptography.SHA256.Create(),
+                        CoreHashAlgorithm.SHA512 => (System.Security.Cryptography.HashAlgorithm)System.Security.Cryptography.SHA512.Create(),
+                        CoreHashAlgorithm.MD5 => (System.Security.Cryptography.HashAlgorithm)System.Security.Cryptography.MD5.Create(),
+                        _ => (System.Security.Cryptography.HashAlgorithm)System.Security.Cryptography.SHA256.Create()
+                    };
+                    var files = Directory.GetFiles(path, "*", System.IO.SearchOption.AllDirectories).OrderBy(f => f);
+                    foreach (var f in files)
+                    {
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(f);
+                        hasher2.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                    }
+                    hasher2.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                    var hash2 = hasher2.Hash!;
+                    return Result<string>.Success(Convert.ToHexString(hash2));
+                }
+            }
             if (!File.Exists(path)) return Result<string>.Failure(Error.NotFound($"File not found: {path}"));
             
             using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);

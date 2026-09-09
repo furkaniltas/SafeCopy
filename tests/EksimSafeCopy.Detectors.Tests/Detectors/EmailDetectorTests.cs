@@ -196,4 +196,29 @@ public class EmailDetectorTests
         detection.Properties.Should().ContainKey("domain");
         detection.Properties["domain"].Should().Be("company.com.tr");
     }
+
+    [Fact]
+    public void Detect_TurkishEmail_WithUnicodeLocalPart_ReturnsSingleDetection()
+    {
+        var document = CreateDocument("E-posta: isakkasükürek15@gmail.com");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detections = result.Value.Where(d => d.Type == DetectionType.Email).ToList();
+        detections.Should().ContainSingle(d => d.Value == "isakkasükürek15@gmail.com");
+    }
+
+    [Fact]
+    public void Detect_TurkishEmail_RuknettinWithDot_ReturnsSingleNotSplit()
+    {
+        var document = CreateDocument("E-posta: rüknettin.test@gmail.com");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detections = result.Value.Where(d => d.Type == DetectionType.Email).ToList();
+        detections.Should().ContainSingle(d => d.Value == "rüknettin.test@gmail.com");
+        detections.Should().NotContain(d => d.Value == "test@gmail.com");
+    }
 }

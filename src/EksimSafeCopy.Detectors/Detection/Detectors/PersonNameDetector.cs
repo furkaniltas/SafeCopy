@@ -41,9 +41,14 @@ public sealed class PersonNameDetector : BaseDetector, IPersonNameDetector
         "internet", "telekom", "dağıtım", "tedarik", "hizmet", "destek",
         "anonym", "anonim", "misafir", "müşteri", "müşteriler", "üye", "üyeler",
         "tesisat", "numarası", "numarasi", "sayaç", "sayac", "abone", "tesisat",
-        "ad", "soyad", "telefon", "adres", "tc", "numara",
+        "ad", "adı", "adi", "soyad", "soyadı", "soyadi", "telefon", "adres", "tc", "numara",
         "icra", "dairesi", "dairesine", "daire", "esas", "talep", "evrakı", "evraki", "evrak",
-        "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin"
+        "takibin", "kesinleştirilmesini", "kesinlestirilmesini", "dava", "dosya", "talebi", "talebin",
+        // Hukuk/banka terminolojisi false positive önleme (ggg.udf.zip)
+        "hesap", "hesabı", "hesabi", "bilgileri", "bilgisi", "banka", "bankası", "bankasi", "bankası",
+        "ödeme", "odeme", "emri", "emir", "örnek", "ornek", "ilamsız", "ilamsiz", "takiplerde",
+        "alacaklı", "alacakli", "borçlu", "borclu", "vekil", "vekili", "temsilci", "temsilcisi", "kanuni",
+        "asliye", "hukuk", "takip", "takipleri", "vakıflar", "vakiflar", "vakıf", "vakif"
     };
 
     private static readonly HashSet<string> FieldLabels = new(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))

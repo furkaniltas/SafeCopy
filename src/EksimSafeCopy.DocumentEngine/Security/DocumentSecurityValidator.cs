@@ -191,6 +191,15 @@ public sealed class DocumentSecurityValidator : IDocumentSecurityValidator
     {
         try
         {
+            // Directory-based UDF: hash content.xml inside
+            if (Directory.Exists(filePath) && filePath.EndsWith(".udf", StringComparison.OrdinalIgnoreCase))
+            {
+                var contentPath = Path.Combine(filePath, "content.xml");
+                if (!File.Exists(contentPath))
+                    contentPath = Path.Combine(filePath, "content");
+                if (File.Exists(contentPath))
+                    filePath = contentPath;
+            }
             using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             System.Security.Cryptography.HashAlgorithm hasher = algorithm switch
             {
@@ -228,7 +237,7 @@ public sealed class DocumentSecurityOptions
     public long MaxFileSizeBytes { get; init; } = 500_000_000; // 500 MB
     public HashSet<string> AllowedExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".pdf", ".docx", ".xlsx", ".txt", ".udf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"
+        ".pdf", ".docx", ".xlsx", ".txt", ".udf", ".udf.zip", ".zip", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"
     };
 }
 public interface IDocumentSecurityValidator
