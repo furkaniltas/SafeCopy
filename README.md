@@ -71,7 +71,8 @@ dotnet build -c Release
 
 # Run
 dotnet run --project src/SafeCopy.App/SafeCopy.App.csproj -c Release
-# Executable: SafeCopy.exe (AssemblyName SafeCopy, version 1.0.0.0)
+# Executable: SafeCopy.App.exe
+# Application version: 1.0.0 (v1.0.0 release)
 ```
 
 Publish example (verified outside repo):
