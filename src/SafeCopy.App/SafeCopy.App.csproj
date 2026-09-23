@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>1591</NoWarn>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Icons\SafeCopy.ico</ApplicationIcon>
+    <AssemblyName>SafeCopy</AssemblyName>
+    <RootNamespace>SafeCopy.App</RootNamespace>
+    <AssemblyTitle>SafeCopy</AssemblyTitle>
+    <Product>SafeCopy</Product>
+    <Version>1.0.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SafeCopy.Core\SafeCopy.Core.csproj" />
+    <ProjectReference Include="..\SafeCopy.DocumentEngine\SafeCopy.DocumentEngine.csproj" />
+    <ProjectReference Include="..\SafeCopy.Detectors\SafeCopy.Detectors.csproj" />
+    <ProjectReference Include="..\SafeCopy.Ocr\SafeCopy.Ocr.csproj" />
+    <ProjectReference Include="..\SafeCopy.Renderer\SafeCopy.Renderer.csproj" />
+    <ProjectReference Include="..\SafeCopy.Infrastructure\SafeCopy.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\test.jsonl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Icons\SafeCopy.ico" />
+  </ItemGroup>
+</Project>

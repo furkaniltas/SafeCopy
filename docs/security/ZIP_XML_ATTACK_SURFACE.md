@@ -1,4 +1,4 @@
-# Eksim SafeCopy — ZIP/XML Attack Surface Evaluation
+# SafeCopy — ZIP/XML Attack Surface Evaluation
 
 ## Overview
 

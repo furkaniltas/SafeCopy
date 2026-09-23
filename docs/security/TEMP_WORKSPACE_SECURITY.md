@@ -1,4 +1,4 @@
-# Eksim SafeCopy — Temporary Workspace Security Model
+# SafeCopy — Temporary Workspace Security Model
 
 ## Overview
 
@@ -9,7 +9,7 @@ All document processing occurs in an isolated temporary workspace. This document
 ## Workspace Structure
 
 ```
-%TEMP%\EksimSafeCopy\
+%TEMP%\SafeCopy\
 ├── {session-guid-1}\
 │   ├── input\           # Copied/linked original documents (read-only)
 │   ├── extracted\       # ZIP/XML extraction, image extraction
@@ -60,7 +60,7 @@ public sealed class SecureTempWorkspace : IDisposable
         _sessionId = Guid.NewGuid().ToString("N");
         _rootPath = Path.Combine(
             Path.GetTempPath(), 
-            "EksimSafeCopy", 
+            "SafeCopy", 
             _sessionId);
         
         // Create with secure ACL
@@ -168,7 +168,7 @@ private void Cleanup()
 ```csharp
 public static void CleanupStaleWorkspaces(TimeSpan maxAge)
 {
-    var root = Path.Combine(Path.GetTempPath(), "EksimSafeCopy");
+    var root = Path.Combine(Path.GetTempPath(), "SafeCopy");
     if (!Directory.Exists(root)) return;
     
     var cutoff = DateTime.UtcNow - maxAge;
@@ -204,7 +204,7 @@ public static void CleanupStaleWorkspaces(TimeSpan maxAge)
 **Mitigation:**
 - Stale cleanup runs at startup (24-hour default)
 - No sensitive data persists beyond 24 hours
-- User can manually delete `%TEMP%\EksimSafeCopy` anytime
+- User can manually delete `%TEMP%\SafeCopy` anytime
 
 ### Scenario: Unhandled exception in processing
 

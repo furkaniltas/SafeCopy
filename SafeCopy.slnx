@@ -1,0 +1,22 @@
+
+<Solution FileFormatVersion="1.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Project Name="SafeCopy.Core" Path="src\SafeCopy.Core\SafeCopy.Core.csproj" Guid="{11111111-1111-1111-1111-111111111111}" />
+  <Project Name="SafeCopy.DocumentEngine" Path="src\SafeCopy.DocumentEngine\SafeCopy.DocumentEngine.csproj" Guid="{22222222-2222-2222-2222-222222222222}" />
+  <Project Name="SafeCopy.Detectors" Path="src\SafeCopy.Detectors\SafeCopy.Detectors.csproj" Guid="{33333333-3333-3333-3333-333333333333}" />
+  <Project Name="SafeCopy.Ocr" Path="src\SafeCopy.Ocr\SafeCopy.Ocr.csproj" Guid="{44444444-4444-4444-4444-444444444444}" />
+  <Project Name="SafeCopy.Renderer" Path="src\SafeCopy.Renderer\SafeCopy.Renderer.csproj" Guid="{55555555-5555-5555-5555-555555555555}" />
+  <Project Name="SafeCopy.Infrastructure" Path="src\SafeCopy.Infrastructure\SafeCopy.Infrastructure.csproj" Guid="{66666666-6666-6666-6666-666666666666}" />
+  <Folder Name="/src/" xmlns="" />
+  <Folder Name="/tests/" xmlns="">
+    <Project Path="tests/SafeCopy.Benchmark.Console/SafeCopy.Benchmark.Console.csproj" />
+    <Project Path="tests/SafeCopy.Benchmark/SafeCopy.Benchmark.csproj" />
+  </Folder>
+  <Project Name="SafeCopy.App" Path="src\SafeCopy.App\SafeCopy.App.csproj" Guid="{77777777-7777-7777-7777-777777777777}" />
+  <Project Name="SafeCopy.Core.Tests" Path="tests\SafeCopy.Core.Tests\SafeCopy.Core.Tests.csproj" Guid="{88888888-8888-8888-8888-888888888888}" />
+  <Project Name="SafeCopy.DocumentEngine.Tests" Path="tests\SafeCopy.DocumentEngine.Tests\SafeCopy.DocumentEngine.Tests.csproj" Guid="{99999999-9999-9999-9999-999999999999}" />
+  <Project Name="SafeCopy.Detectors.Tests" Path="tests\SafeCopy.Detectors.Tests\SafeCopy.Detectors.Tests.csproj" Guid="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}" />
+  <Project Name="SafeCopy.Ocr.Tests" Path="tests\SafeCopy.Ocr.Tests\SafeCopy.Ocr.Tests.csproj" Guid="{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}" />
+  <Project Name="SafeCopy.Renderer.Tests" Path="tests\SafeCopy.Renderer.Tests\SafeCopy.Renderer.Tests.csproj" Guid="{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}" />
+  <Project Name="SafeCopy.Security.Tests" Path="tests\SafeCopy.Security.Tests\SafeCopy.Security.Tests.csproj" Guid="{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}" />
+  <Project Name="SafeCopy.App.Tests" Path="tests\SafeCopy.App.Tests\SafeCopy.App.Tests.csproj" Guid="{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}" />
+</Solution>

@@ -1,4 +1,4 @@
-# Eksim SafeCopy — OCR Attack Surface Evaluation
+# SafeCopy — OCR Attack Surface Evaluation
 
 ## Overview
 

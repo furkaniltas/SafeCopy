@@ -1,8 +1,8 @@
-# Eksim SafeCopy — Agent Instructions
+# SafeCopy — Agent Instructions
 
 ## Project Context
 
-**Product Name:** Eksim SafeCopy  
+**Product Name:** SafeCopy  
 **Platform:** Windows 11  
 **Framework:** .NET 10, WPF, MVVM, Clean Architecture  
 **Core Principle:** Fully local operation — no internet, no cloud APIs, no telemetry
@@ -11,22 +11,22 @@
 
 ### Solution Structure
 ```
-EksimSafeCopy.slnx
+SafeCopy.slnx
 ├── src
-│   ├── EksimSafeCopy.App
-│   ├── EksimSafeCopy.Core
-│   ├── EksimSafeCopy.DocumentEngine
-│   ├── EksimSafeCopy.Detectors
-│   ├── EksimSafeCopy.Ocr
-│   ├── EksimSafeCopy.Renderer
-│   └── EksimSafeCopy.Infrastructure
+│   ├── SafeCopy.App
+│   ├── SafeCopy.Core
+│   ├── SafeCopy.DocumentEngine
+│   ├── SafeCopy.Detectors
+│   ├── SafeCopy.Ocr
+│   ├── SafeCopy.Renderer
+│   └── SafeCopy.Infrastructure
 ├── tests
-│   ├── EksimSafeCopy.Core.Tests
-│   ├── EksimSafeCopy.DocumentEngine.Tests
-│   ├── EksimSafeCopy.Detectors.Tests
-│   ├── EksimSafeCopy.Ocr.Tests
-│   ├── EksimSafeCopy.Renderer.Tests
-│   └── EksimSafeCopy.Security.Tests
+│   ├── SafeCopy.Core.Tests
+│   ├── SafeCopy.DocumentEngine.Tests
+│   ├── SafeCopy.Detectors.Tests
+│   ├── SafeCopy.Ocr.Tests
+│   ├── SafeCopy.Renderer.Tests
+│   └── SafeCopy.Security.Tests
 ├── docs
 └── installer
 ```
@@ -92,7 +92,7 @@ No "Safe Copy Ready" message without verification pass.
 
 ## Build/Test Standard
 ```powershell
-MSBuild.exe EksimSafeCopy.slnx /t:Build /p:Configuration=Debug
+MSBuild.exe SafeCopy.slnx /t:Build /p:Configuration=Debug
 vstest.console.exe <test-dll> /Logger:Console
 ```
 Report: `Build: 0 Error, 0 Warning | Tests: 84/84 Passed | Security tests: 22/22 Passed`

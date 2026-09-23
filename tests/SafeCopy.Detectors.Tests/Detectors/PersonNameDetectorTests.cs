@@ -1,0 +1,481 @@
+using System.IO;
+using SafeCopy.Core.Abstractions;
+using SafeCopy.Core.Models;
+using SafeCopy.Detectors.Detection.Detectors;
+using SafeCopy.Detectors.Detection.Pipeline;
+using SafeCopy.DocumentEngine.Security;
+using SafeCopy.Infrastructure;
+using DF = SafeCopy.Core.Abstractions.DocumentFormat;
+using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace SafeCopy.Detectors.Tests.Detectors;
+
+public class PersonNameDetectorTests
+{
+    private readonly IDetectionEngine _detectionEngine;
+
+    public PersonNameDetectorTests()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new DocumentSecurityOptions());
+        services.AddSingleton<IDocumentSecurityValidator, DocumentSecurityValidator>();
+        services.AddSingleton<IFileSystem, FileSystem>();
+        services.AddDetectors();
+
+        var provider = services.BuildServiceProvider();
+        _detectionEngine = provider.GetRequiredService<IDetectionEngine>();
+    }
+
+    private Document CreateDocument(string text)
+    {
+        var page = new DocumentPage
+        {
+            PageNumber = 1,
+            Width = 800,
+            Height = 600,
+            DpiX = 96,
+            DpiY = 96,
+            Text = text,
+            TextBlocks = new List<TextBlock>
+            {
+                new TextBlock
+                {
+                    Text = text,
+                    Type = TextBlockType.Paragraph,
+                    Direction = TextDirection.LeftToRight,
+                    OrderIndex = 0,
+                    PageNumber = 1
+                }
+            }.AsReadOnly()
+        };
+
+        return new Document
+        {
+            Name = "test.txt",
+            Format = DF.Txt,
+            Pages = new[] { page },
+            Metadata = new DocumentMetadata()
+        };
+    }
+
+    [Fact]
+    public void Detect_SimpleTurkishName_ReturnsDetection()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
+    }
+
+    [Fact]
+    public void Detect_ThreeWordName_ReturnsDetection()
+    {
+        var document = CreateDocument("Adı: Ahmet Mehmet Yılmaz");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Mehmet Yılmaz");
+    }
+
+    [Fact]
+    public void Detect_NameWithTurkishCharacters_ReturnsDetection()
+    {
+        var document = CreateDocument("İsim: Ahmet Çelik");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Çelik");
+    }
+
+    [Fact]
+    public void Detect_UppercaseName_ReturnsDetection()
+    {
+        var document = CreateDocument("MÜŞTERİ: AHMET YILMAZ");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "AHMET YILMAZ");
+    }
+
+    [Fact]
+    public void Detect_SingleWord_NotDetected()
+    {
+        var document = CreateDocument("İsim: Ahmet");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName);
+    }
+
+    [Fact]
+    public void Detect_CityName_NotDetected()
+    {
+        var document = CreateDocument("Adres: İstanbul");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName);
+    }
+
+    [Fact]
+    public void Detect_CompanyName_NotDetected()
+    {
+        var document = CreateDocument("Firma: Elektrik Dağıtım A.Ş.");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName);
+    }
+
+    [Fact]
+    public void Detect_DepartmentName_NotDetected()
+    {
+        var document = CreateDocument("Birim: Bilgi İşlem Müdürlüğü");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName);
+    }
+
+    [Fact]
+    public void Detect_NameWithLabel_HigherConfidence()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detection = result.Value.First(d => d.Type == DetectionType.FullName);
+        detection.Confidence.Should().BeGreaterThan(0.7);
+    }
+
+    [Fact]
+    public void Detect_NameWithNegativeContext_LowerConfidence()
+    {
+        var document = CreateDocument("Şirket: Ahmet Yılmaz Ltd.");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detections = result.Value.Where(d => d.Type == DetectionType.FullName).ToList();
+        detections.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_MultipleNames_AllDetected()
+    {
+        var document = CreateDocument("Müşteri: Ahmet Yılmaz Temsilci: Ayşe Demir");
+
+        var result = _detectionEngine.Detect(document);
+
+        result.IsSuccess.Should().BeTrue();
+        var detections = result.Value.Where(d => d.Type == DetectionType.FullName).ToList();
+        detections.Should().HaveCount(2);
+        detections.Select(d => d.Value).Should().Contain("Ahmet Yılmaz", "Ayşe Demir");
+    }
+
+    [Fact]
+    public void Detect_InstitutionName_DiyarbakirIcraDairesi_NotDetected()
+    {
+        var document = CreateDocument("DİYARBAKIR İCRA DAİRESİ");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "DİYARBAKIR İCRA DAİRESİ");
+    }
+
+    [Fact]
+    public void Detect_LegalDocumentHeader_NeEsasTalepEvraki_NotDetected()
+    {
+        var document = CreateDocument("NE ESAS TALEP EVRAKI");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "NE ESAS TALEP EVRAKI");
+    }
+
+    [Fact]
+    public void Detect_LegalPhrase_TakibinKesinlestirilmesini_NotDetected()
+    {
+        var document = CreateDocument("Takibin Kesinleştirilmesini");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "Takibin Kesinleştirilmesini");
+    }
+
+    [Fact]
+    public void Detect_RealPersonName_SabriGoclu_Detected()
+    {
+        var document = CreateDocument("SABRİ GÖÇLÜ");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "SABRİ GÖÇLÜ");
+    }
+
+    [Fact]
+    public void Detect_Prefix_Sahip_DilaraYucel_Stripped()
+    {
+        var document = CreateDocument("Sahip Dilara Yücel");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Dilara Yücel");
+        result.Value.Should().NotContain(d => d.Type == DetectionType.FullName && d.Value == "Sahip Dilara Yücel");
+    }
+
+    [Fact]
+    public void Detect_Prefix_Alici_DorukGAltun_Stripped()
+    {
+        var document = CreateDocument("Alıcı Doruk G. Altun");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        var det = result.Value.Where(d => d.Type == DetectionType.FullName).ToList();
+        det.Should().ContainSingle(d => d.Value == "Doruk G. Altun");
+    }
+
+    [Fact]
+    public void Detect_Prefix_Danisan_SavasSinanYildirim_Stripped()
+    {
+        var document = CreateDocument("Danışan Savaş Sinan Yıldırım");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Savaş Sinan Yıldırım");
+    }
+
+    [Fact]
+    public void Detect_MiddleInitial_LeventB_Yildirim()
+    {
+        var document = CreateDocument("Levent B. Yıldırım");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Levent B. Yıldırım");
+    }
+
+    [Fact]
+    public void Detect_MiddleInitial_VeliV_Bozkurt()
+    {
+        var document = CreateDocument("Veli V. Bozkurt");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Veli V. Bozkurt");
+    }
+
+    [Fact]
+    public void Detect_MiddleInitial_CemE_Sezer()
+    {
+        var document = CreateDocument("Cem E. Sezer");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Cem E. Sezer");
+    }
+
+    [Fact]
+    public void Detect_MiddleInitial_YagmurP_Sakir_TurkishChars()
+    {
+        var document = CreateDocument("Yağmur P. Şakır");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Yağmur P. Şakır");
+    }
+
+    [Fact]
+    public void Detect_MiddleInitial_DorukG_Altun_TurkishChars()
+    {
+        var document = CreateDocument("Doruk G. Altun");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Doruk G. Altun");
+    }
+
+    [Fact]
+    public void Detect_TitleOnly_DanisanUzm_NotDetected()
+    {
+        var document = CreateDocument("Danışan Uzm");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_TitleOnly_TarafAv_NotDetected()
+    {
+        var document = CreateDocument("Taraf Av.");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_TitleOnly_HastaDyt_NotDetected()
+    {
+        var document = CreateDocument("Hasta Dyt.");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_AddressComponent_IcKapi_NotDetected()
+    {
+        var document = CreateDocument("İç Kapı 74Q");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value == "İç Kapı").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_PoyrazMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Poyraz Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Poyraz Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_SirinE_Maden_ReturnsDetection()
+    {
+        var document = CreateDocument("Şirin E. Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Şirin E. Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_JaleI_Maden_ReturnsDetection()
+    {
+        var document = CreateDocument("Jale İ. Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Jale İ. Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_HalilMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Halil Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Halil Maden");
+    }
+
+    [Fact]
+    public void Detect_ValidSurname_HulyaTasMaden_ReturnsDetection()
+    {
+        var document = CreateDocument("Hülya Taş Maden");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Hülya Taş Maden");
+    }
+
+    [Fact]
+    public void Detect_NegativeKeyword_AdSoyad_NotDetected()
+    {
+        var document = CreateDocument("ad soyad");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.ToLower().Contains("ad soyad")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_KnownPositive_SavasSinanYildirim_ReturnsDetection()
+    {
+        var document = CreateDocument("Savaş Sinan Yıldırım");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Savaş Sinan Yıldırım");
+    }
+
+    [Fact]
+    public void Detect_MultilineBoundary_FullNameDoesNotSpanNewlineIntoLabel()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz\nTelefon: 0555 123 45 67");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("Ahmet Yılmaz") && d.Value.Contains("Telefon")).Should().BeEmpty();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("\n")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_MultilineBoundary_NameStillDetected()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz\nTelefon: 0555 123 45 67");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
+    }
+
+    [Fact]
+    public void Detect_MultilineBoundary_AhmetYilmazTelefon_NotSingleCandidate()
+    {
+        var document = CreateDocument("Ahmet Yılmaz\nTelefon");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz\nTelefon").Should().BeEmpty();
+        result.Value.Where(d => d.Type == DetectionType.FullName && d.Value.Contains("\n")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_SameLine_NameStillDetected()
+    {
+        var document = CreateDocument("Ad Soyad: Ahmet Yılmaz");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle(d => d.Type == DetectionType.FullName && d.Value == "Ahmet Yılmaz");
+    }
+
+    [Theory]
+    [InlineData("Danışan Merve Z. Kaya", "Merve Z. Kaya")]
+    [InlineData("Danışan Aslı S. Bulut'la", "Aslı S. Bulut")]
+    [InlineData("Danışan Dr. Serkan Alkan Ergin", "Serkan Alkan Ergin")]
+    [InlineData("Danışan Dyt. Ece Alper Yılmaz", "Ece Alper Yılmaz")]
+    [InlineData("Danışan Av. Hakan Hande Kavak", "Hakan Hande Kavak")]
+    [InlineData("Hasta Veli G. Uzun", "Veli G. Uzun")]
+    [InlineData("Hasta Kutay T. Başar", "Kutay T. Başar")]
+    [InlineData("Danışan Halil İ. Kurt'dan", "Halil İ. Kurt")]
+    public void Detect_PrefixStripped_MiddleInitialAndTitle_CorrectlyDetected(string text, string expected)
+    {
+        var document = CreateDocument(text);
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == expected);
+    }
+
+    [Theory]
+    [InlineData("Danışan Dyt. Kerem Irmak Korkmaz", "Kerem Irmak Korkmaz")]
+    [InlineData("Danışan Dr. Levent Duran", "Levent Duran")]
+    [InlineData("Danışman Leyla K. Bayraktar", "Leyla K. Bayraktar")]
+    [InlineData("Danışan Buket E. Dikmen'dan", "Buket E. Dikmen")]
+    public void Detect_PrefixStripped_AdditionalG_PrefixCases(string text, string expected)
+    {
+        var document = CreateDocument(text);
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == expected);
+    }
+
+    [Fact]
+    public void Detect_Overlapping_CerenJaleKalkanPolat_CoversCompleteName()
+    {
+        var document = CreateDocument("Taraf Danışman Ceren Jale Kalkan Polat");
+        var result = _detectionEngine.Detect(document);
+        result.IsSuccess.Should().BeTrue();
+        // The 4-word name must be retained as a single FullName, not fragmented into Jale Kalkan / Ceren Polat
+        result.Value.Should().Contain(d => d.Type == DetectionType.FullName && d.Value == "Ceren Jale Kalkan Polat");
+        var detection = result.Value.First(d => d.Type == DetectionType.FullName && d.Value == "Ceren Jale Kalkan Polat");
+        detection.TextSpan.Should().NotBeNull();
+        detection.TextSpan!.Text.Should().Be("Ceren Jale Kalkan Polat");
+        // Ensure overlapping shorter fragments do not remain as the only coverage (which would leave Kalkan Polat uncovered)
+        var fullNames = result.Value.Where(d => d.Type == DetectionType.FullName).Select(d => d.Value).ToList();
+        // At least the 4-word should be present; if Jale Kalkan also present, it must overlap and be deduped to the longer
+        fullNames.Should().Contain("Ceren Jale Kalkan Polat");
+    }
+}

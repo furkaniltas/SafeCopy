@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SafeCopy.Core\SafeCopy.Core.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.Renderer\SafeCopy.Renderer.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.DocumentEngine\SafeCopy.DocumentEngine.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.Detectors\SafeCopy.Detectors.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.Ocr\SafeCopy.Ocr.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.Infrastructure\SafeCopy.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+  </ItemGroup>
+</Project>

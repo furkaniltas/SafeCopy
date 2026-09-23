@@ -1,10 +1,10 @@
-# Eksim SafeCopy — Development Checklist
+# SafeCopy — Development Checklist
 
 ---
 
 # Phase 0 — Product, Security and Architecture Decisions
 
-- [x] Product name `Eksim SafeCopy` finalized
+- [x] Product name `SafeCopy` finalized
 - [x] No legacy product name references found in repository
 - [x] Product purpose documented
 - [x] Windows 11 target confirmed
@@ -30,13 +30,13 @@
 - [x] `.NET 10` solution
 - [x] WPF application
 - [x] Windows 11 target
-- [x] `EksimSafeCopy.App`
-- [x] `EksimSafeCopy.Core`
-- [x] `EksimSafeCopy.DocumentEngine`
-- [x] `EksimSafeCopy.Detectors`
-- [x] `EksimSafeCopy.Ocr`
-- [x] `EksimSafeCopy.Renderer`
-- [x] `EksimSafeCopy.Infrastructure`
+- [x] `SafeCopy.App`
+- [x] `SafeCopy.Core`
+- [x] `SafeCopy.DocumentEngine`
+- [x] `SafeCopy.Detectors`
+- [x] `SafeCopy.Ocr`
+- [x] `SafeCopy.Renderer`
+- [x] `SafeCopy.Infrastructure`
 - [x] Test projects
 - [x] Project references
 - [x] Core layer WPF/file-system/Windows API independence
@@ -281,7 +281,7 @@ Detector may use when needed:
 
 # Phase 7 — OCR Engine — Finalized 2026-08-27
 
-Evidence: `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs:15` `IOcrEngine` IsAvailable/EngineName/SupportedLanguages, `SecureImagePreprocessor.cs` MaxDimension 8192/MaxPixels 100MP/MaxFileSize 50MB + deskew/denoise/contrast/threshold/rotation/resolution, VSTest 416/416, EXE verified.
+Evidence: `src/SafeCopy.Ocr/LocalOcrEngine.cs:15` `IOcrEngine` IsAvailable/EngineName/SupportedLanguages, `SecureImagePreprocessor.cs` MaxDimension 8192/MaxPixels 100MP/MaxFileSize 50MB + deskew/denoise/contrast/threshold/rotation/resolution, VSTest 416/416, EXE verified.
 
 - [x] `IOcrEngine` (`Core/Abstractions/CoreInterfaces.cs:41`, `Ocr/SecureImagePreprocessor.cs`, `LocalOcrEngine.cs:15`, `OcrModule.cs`)
 - [x] Local OCR implementation (Windows.Media.Ocr reflection preferred, Fallback local preprocessing, no cloud, bundled)
@@ -300,19 +300,19 @@ Evidence: `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs:15` `IOcrEngine` IsAvailable/
 - [x] OCR cancellation (`CancellationToken.ThrowIfCancellationRequested` → `CANCELLED`)
 - [x] OCR failure fallback (returns `INTERNAL_ERROR` without crash, DocumentEngine keeps original if OCR fails)
 - [x] Scanned PDF integration (`PdfDocumentIngestor:66` calls `IOcrEngine.Recognize` when `words==0 && images.Any()`, maps `OcrResult→TextBlocks`)
-- [x] OCR test corpus (`tests/EksimSafeCopy.Ocr.Tests/OcrEngineTests.cs` 22 tests)
+- [x] OCR test corpus (`tests/SafeCopy.Ocr.Tests/OcrEngineTests.cs` 22 tests)
 - [x] Turkish scanned-document tests (`Ahmet Yılmaz`, `İstanbul` with confidence/bbox, `ImageIngestion WithOcr` marker `OCR_MARKER:`)
 
 ---
 
 # Phase 6/8 — Preview / Selection UI — Finalized 2026-08-26
 
-Evidence: `src/EksimSafeCopy.App/` WPF MVVM, `MainWindow.xaml` header #0F2438 + #2F8F4E 34x34, footer #FAFBFC, 3-column body; `MainViewModel.cs` async pipeline `IDocumentEngine → IDetectionEngine → IRenderer/IRedactionPlanner/IVerificationEngine` via DI; VSTest 394/394, EXE launch verified.
+Evidence: `src/SafeCopy.App/` WPF MVVM, `MainWindow.xaml` header #0F2438 + #2F8F4E 34x34, footer #FAFBFC, 3-column body; `MainViewModel.cs` async pipeline `IDocumentEngine → IDetectionEngine → IRenderer/IRedactionPlanner/IVerificationEngine` via DI; VSTest 394/394, EXE launch verified.
 
 - [x] Main window (`App.xaml`, `MainWindow.xaml`, `MainViewModel.cs:30`)
 - [x] Windows 11 layout (dark navy header, white workspace, footer strip)
 - [x] Corporate header (`MainWindow.xaml:15` Header Grid #0F2438)
-- [x] Eksim SafeCopy logo (34x34 #2F8F4E EK 800 14px + title 19px 800 + subtitle #B7C4D0)
+- [x] SafeCopy logo (34x34 #2F8F4E EK 800 14px + title 19px 800 + subtitle #B7C4D0)
 - [~] Drag & Drop — not yet, file selection via dialog only (future)
 - [x] File selection (`IFileDialogService` → `OpenFileDialog` filter PDF/DOCX/XLSX/TXT/UDF/PNG/JPEG/TIFF/BMP, `MainViewModel.OpenFileAsync:209`)
 - [x] Supported format indicators (filter + DocumentEngine format validation, not only UI)
@@ -339,9 +339,9 @@ Evidence: `src/EksimSafeCopy.App/` WPF MVVM, `MainWindow.xaml` header #0F2438 + 
 
 # Phase 5/9 — Masking Engine (Renderer) — Finalized 2026-08-26
 
-Evidence: `EksimSafeCopy.slnx` MSBuild 0 Error 0 Warning, VSTest 382/382 Passed, legacy search 0, git clean (after commit)
+Evidence: `SafeCopy.slnx` MSBuild 0 Error 0 Warning, VSTest 382/382 Passed, legacy search 0, git clean (after commit)
 
-- [x] Masking abstraction (`IRedactor`, `IRedactionPlanner`, `IRedactionStrategy` in `src/EksimSafeCopy.Renderer/`)
+- [x] Masking abstraction (`IRedactor`, `IRedactionPlanner`, `IRedactionStrategy` in `src/SafeCopy.Renderer/`)
 - [x] Full redaction (strategy `FullRedaction` → `█` blocks)
 - [x] Placeholder redaction (`Placeholder` strategy)
 - [x] Detection-type placeholder (`DefaultRedactionStrategy` TypeLabel → `[AD SOYAD]`, `[TC_KIMLIK_NO]`, etc.)
@@ -388,7 +388,7 @@ Evidence: `EksimSafeCopy.slnx` MSBuild 0 Error 0 Warning, VSTest 382/382 Passed,
 
 # Phase 10 — Output Verification — Finalized 2026-08-26
 
-- [x] Output scanner (`src/EksimSafeCopy.Renderer/Verification/VerificationEngine.cs` → `LoadDocumentForVerification` with Detectors + DocumentEngine)
+- [x] Output scanner (`src/SafeCopy.Renderer/Verification/VerificationEngine.cs` → `LoadDocumentForVerification` with Detectors + DocumentEngine)
 - [x] PII re-detection (`_detectionEngine.Detect` on reloaded output)
 - [x] Remaining PII count (`ResidualDetections.Count`, `CriticalResidualCount`)
 - [x] Detection comparison (before/after)
@@ -407,7 +407,7 @@ Acceptance: `Output with PII residue cannot be presented as safe copy.` — veri
 
 # Phase 11 — Privacy and Local-Only Security — Finalized 2026-08-27
 
-Evidence: `docs/security/LOCAL_ONLY_AUDIT.md` + `src/EksimSafeCopy.Infrastructure/FileSystem.cs:206` SecureTempWorkspace ACL + VSTest 432/432, `Security.Tests 16/16`.
+Evidence: `docs/security/LOCAL_ONLY_AUDIT.md` + `src/SafeCopy.Infrastructure/FileSystem.cs:206` SecureTempWorkspace ACL + VSTest 432/432, `Security.Tests 16/16`.
 
 - [x] Network dependency audit (`LOCAL_ONLY_AUDIT.md §3.2` `Select-String src/**/*.cs` 0 hits for HttpClient/WebClient/RestSharp/TcpClient)
 - [x] HTTP/HTTPS call absence verified (no `http(s)://` outbound literals, `Network_NoHttpOrHttpsLiteralForOutbound`)
@@ -428,7 +428,7 @@ Evidence: `docs/security/LOCAL_ONLY_AUDIT.md` + `src/EksimSafeCopy.Infrastructur
 
 # Phase 12 — Batch Processing — Finalized 2026-08-27
 
-Evidence: `src/EksimSafeCopy.Core/Abstractions/BatchAbstractions.cs` + `Infrastructure/Batch/BatchProcessor.cs` + `App/ViewModels/BatchItemViewModel.cs`/`MainViewModel` batch commands + `App.Tests/BatchProcessorTests.cs` 16 tests, VSTest 448/448, EXE batch queue verified.
+Evidence: `src/SafeCopy.Core/Abstractions/BatchAbstractions.cs` + `Infrastructure/Batch/BatchProcessor.cs` + `App/ViewModels/BatchItemViewModel.cs`/`MainViewModel` batch commands + `App.Tests/BatchProcessorTests.cs` 16 tests, VSTest 448/448, EXE batch queue verified.
 
 - [x] Multiple file selection (`IFileDialogService.OpenFiles` Multiselect, `MainViewModel.AddFilesToBatchCommand`, `BatchProcessorTests.Batch_MultipleFormats`)
 - [x] Multiple drag & drop (`MainWindow.xaml.cs` AllowDrop + `DragEnter/Drop` → `AddFilesToBatch`, `Batch_SameBatchFilesDoNotAffectEachOther`)
@@ -446,9 +446,9 @@ Evidence: `src/EksimSafeCopy.Core/Abstractions/BatchAbstractions.cs` + `Infrastr
 
 # Phase 13 — User Experience and Corporate UI
 
-Eksim IT Utility visual language referenced but NOT copied verbatim.
+reference utility visual language referenced but NOT copied verbatim.
 
-Eksim SafeCopy has its own product identity.
+SafeCopy has its own product identity.
 
 ## Color Palette
 
@@ -470,10 +470,10 @@ Eksim SafeCopy has its own product identity.
 
 Group indicators:
 
-- Eksim Enerji: `#2F8F4E`
-- Dicle Grubu: `#D9622B`
-- Gıda Grubu: `#C9A24B`
-- Eksim Ventures: `#5B6EE8`
+- SafeCopy: `#2F8F4E`
+- : `#D9622B`
+- : `#C9A24B`
+- : `#5B6EE8`
 
 ## Header — Polished 2026-08-27
 
@@ -484,7 +484,7 @@ Group indicators:
 - [x] White brand mark (`EK` White)
 - [x] Brand mark font-weight 800 (`FontWeight="ExtraBold"`)
 - [x] Brand mark font-size 14px (`FontSize="14"`)
-- [x] `Eksim SafeCopy` title (`Text="Eksim SafeCopy"` White)
+- [x] `SafeCopy` title (`Text="SafeCopy"` White)
 - [x] Title white (`Foreground="White"`)
 - [x] Title font-size approximately 19px (`FontSize="19"`)
 - [x] Title font-weight 800 (`ExtraBold`)
@@ -514,10 +514,10 @@ It is static/decorative and must not trigger filtering or navigation.
 
 Items:
 
-- [x] Green dot `#2F8F4E` + `Eksim Enerji` (`DotGreen`)
-- [x] Orange dot `#D9622B` + `Dicle Grubu` (`DicleOrange`)
-- [x] Gold/mustard dot `#C9A24B` + `Gıda Grubu` (`GidaGold`)
-- [x] Purple-blue dot `#5B6EE8` + `Eksim Ventures` (`VenturesPurple`)
+- [x] Green dot `#2F8F4E` + `SafeCopy` (`DotGreen`)
+- [x] Orange dot `#D9622B` + `` (`AccentOrange`)
+- [x] Gold/mustard dot `#C9A24B` + `` (`AccentGold`)
+- [x] Purple-blue dot `#5B6EE8` + `` (`AccentPurple`)
 
 Footer items are decorative only.
 
@@ -826,7 +826,7 @@ Build with Visual Studio MSBuild.
 Preferred:
 
 ```powershell
-MSBuild.exe EksimSafeCopy.slnx /t:Build /p:Configuration=Debug
+MSBuild.exe SafeCopy.slnx /t:Build /p:Configuration=Debug
 ```
 
 Test with:
@@ -950,11 +950,11 @@ Security verification failed
 
 # UI Design Rule
 
-Eksim IT Utility current corporate visual language MAY be referenced.
+reference utility current corporate visual language MAY be referenced.
 
 But NO verbatim copy.
 
-Eksim SafeCopy MUST have own product identity.
+SafeCopy MUST have own product identity.
 
 Main visual character:
 
@@ -965,7 +965,7 @@ Main visual character:
 - No unnecessary animation
 - White/light workspace
 - Dark navy header
-- Eksim green primary action
+- Primary green primary action
 - Clear detection state
 - Clear security status
 
@@ -1054,7 +1054,7 @@ Preserve existing user changes.
 
 Create/update `AGENTS.md` and `DEVELOPMENT_CHECKLIST.md`.
 
-Verify product name is `Eksim SafeCopy` everywhere in repository.
+Verify product name is `SafeCopy` everywhere in repository.
 
 Then apply Phase 0.
 

@@ -1,4 +1,4 @@
-# Eksim SafeCopy — Output Verification Mandatory Acceptance Criteria
+# SafeCopy — Output Verification Mandatory Acceptance Criteria
 
 ## Principle
 

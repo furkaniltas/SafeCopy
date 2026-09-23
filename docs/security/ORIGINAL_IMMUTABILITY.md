@@ -1,4 +1,4 @@
-# Eksim SafeCopy — Original Document Immutability Guarantee
+# SafeCopy — Original Document Immutability Guarantee
 
 ## Principle
 

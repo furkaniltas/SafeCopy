@@ -1,4 +1,4 @@
-# Eksim SafeCopy — Local-Only Security Audit (Phase 11)
+# SafeCopy — Local-Only Security Audit (Phase 11)
 
 **Date:** 2026-08-27  
 **Version:** 1.0  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-Eksim SafeCopy is verified **fully local**. No outbound network calls exist in source, no HTTP/DNS usage, no telemetry/analytics SDKs, no cloud OCR, no external AI APIs. Temp workspace isolation with ACLs and deterministic cleanup is implemented and tested. Original hash immutability and output independence are proven. Manual Windows Firewall and Offline checks are documented for corporate validation.
+SafeCopy is verified **fully local**. No outbound network calls exist in source, no HTTP/DNS usage, no telemetry/analytics SDKs, no cloud OCR, no external AI APIs. Temp workspace isolation with ACLs and deterministic cleanup is implemented and tested. Original hash immutability and output independence are proven. Manual Windows Firewall and Offline checks are documented for corporate validation.
 
 **Verdict:** **PASS — Local-Only boundary intact.**
 
@@ -20,8 +20,8 @@ Eksim SafeCopy is verified **fully local**. No outbound network calls exist in s
 
 - **Source scan:** `git grep` / ripgrep over `src/**/*.cs` and `src/**/*.csproj` (2026-08-27 snapshot).
 - **Package audit:** Enumerated all `PackageReference` in `src/**/*.csproj`.
-- **Code review:** `src/EksimSafeCopy.Infrastructure/FileSystem.cs` (`SecureTempWorkspace`), `src/EksimSafeCopy.DocumentEngine/Security/DocumentSecurityValidator.cs`, `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs`.
-- **Test evidence:** `tests/EksimSafeCopy.Security.Tests/LocalOnlySecurityTests.cs` — 16 tests, all passing.
+- **Code review:** `src/SafeCopy.Infrastructure/FileSystem.cs` (`SecureTempWorkspace`), `src/SafeCopy.DocumentEngine/Security/DocumentSecurityValidator.cs`, `src/SafeCopy.Ocr/LocalOcrEngine.cs`.
+- **Test evidence:** `tests/SafeCopy.Security.Tests/LocalOnlySecurityTests.cs` — 16 tests, all passing.
 - **Build assumption:** Offline NuGet restore from local cache; no remote download during build in isolated network.
 
 ---
@@ -63,7 +63,7 @@ Select-String -Path "src/**/*.csproj" -Pattern "OpenAI|Anthropic|Azure\.AI|Cogni
 | `using System.Net` | **0** | No file in `src/` imports `System.Net`. |
 | Telemetry (`ApplicationInsights`, `TelemetryClient`, `TrackEvent`) | **0** | No reference in `src/**/*.cs` or `*.csproj`. |
 | Analytics (`GoogleAnalytics`, `Mixpanel`, `Segment`, `Amplitude`, `PostHog`) | **0** | No reference. |
-| Cloud OCR (`Azure Cognitive`, `ComputerVision`, `Textract`, `Google Vision`) | **0** | Only local `LocalOcrEngine` via `Windows.Media.Ocr` reflection (bundled OS API, no network). See `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs:15`. |
+| Cloud OCR (`Azure Cognitive`, `ComputerVision`, `Textract`, `Google Vision`) | **0** | Only local `LocalOcrEngine` via `Windows.Media.Ocr` reflection (bundled OS API, no network). See `src/SafeCopy.Ocr/LocalOcrEngine.cs:15`. |
 | External AI (`OpenAI`, `Anthropic`, `Gemini`, `api.openai.com`) | **0** | No strings, no packages, no config. |
 | `http://` / `https://` literal strings in `src/` | **0** | Verified by grep for `http://` and `https://`. Only occurrences are in test comments/docs, not outbound calls. |
 
@@ -140,7 +140,7 @@ Evidence: `Select-String` for `ApplicationInsights` across `src/` = 0 hits. `Sel
 
 ## 8. Cloud OCR Absence Verified
 
-- OCR path: `src/EksimSafeCopy.Ocr/LocalOcrEngine.cs` → `IOcrEngine` with `IsAvailable`, `EngineName`, `SupportedLanguages ["tr","en"]`.
+- OCR path: `src/SafeCopy.Ocr/LocalOcrEngine.cs` → `IOcrEngine` with `IsAvailable`, `EngineName`, `SupportedLanguages ["tr","en"]`.
 - Implementation: Prefers **local** `Windows.Media.Ocr` via reflection (OS-provided, no network), otherwise fallback preprocessing with `SecureImagePreprocessor` (ImageSharp — local).
 - No `Azure.AI.Vision`, `CognitiveServices`, `ComputerVisionClient`, `TextractClient`, `ImageAnnotatorClient`.
 - OCR language models are **bundled/OS-provided** — no download at runtime (`LocalOcrEngine` throws `TIMEOUT`/`CANCELLED`/`INTERNAL_ERROR` locally without network fallback).
@@ -154,7 +154,7 @@ Evidence: `Select-String` for `ApplicationInsights` across `src/` = 0 hits. `Sel
 
 - No `OpenAI`, `Anthropic`, `Claude`, `Gemini`, `generativelanguage.googleapis.com`, `api.openai.com`, `api.anthropic.com`.
 - No prompt-injection or cloud masking path.
-- `src/EksimSafeCopy.Renderer` masking strategies (`FullRedaction`, `TypeLabel`, `PartialMask`, etc.) are **deterministic, local string/bitmap operations**.
+- `src/SafeCopy.Renderer` masking strategies (`FullRedaction`, `TypeLabel`, `PartialMask`, etc.) are **deterministic, local string/bitmap operations**.
 
 Evidence: `Select-String "OpenAI|Anthropic|Gemini"` in `src/` = 0 hits. No API key config section exists.
 
@@ -164,11 +164,11 @@ Evidence: `Select-String "OpenAI|Anthropic|Gemini"` in `src/` = 0 hits. No API k
 
 ## 10. Temp Workspace Security Review
 
-Implementation: `src/EksimSafeCopy.Infrastructure/FileSystem.cs:192` `SecureTempWorkspace : ITempWorkspace`
+Implementation: `src/SafeCopy.Infrastructure/FileSystem.cs:192` `SecureTempWorkspace : ITempWorkspace`
 
 | Requirement | Implementation | Evidence |
 |-------------|---------------|----------|
-| Per-session isolation (GUID) | `_sessionId = Guid.NewGuid().ToString("N")`; `_rootPath = Path.Combine(Path.GetTempPath(), "EksimSafeCopy", _sessionId)` | `FileSystem.cs:209-210` |
+| Per-session isolation (GUID) | `_sessionId = Guid.NewGuid().ToString("N")`; `_rootPath = Path.Combine(Path.GetTempPath(), "SafeCopy", _sessionId)` | `FileSystem.cs:209-210` |
 | Root + subdirs ACL (current user only) | `SetSecureAcl(_rootPath)` + `SetSecureAcl(InputPath/.../VerificationPath)`; `SetAccessRuleProtection(true,false)`; `FileSystemAccessRule(currentUser, FullControl, ContainerInherit|ObjectInherit, None, Allow)` | `FileSystem.cs:219-241`, also applied to root (fix 2026-08-27) |
 | Inheritance disabled | `security.SetAccessRuleProtection(true, false)` | `FileSystem.cs:225` |
 | Isolation of 5 subdirs | `input`, `extracted`, `ocr`, `output`, `verification` each created via `IFileSystem.CreateDirectory` and ACL'd | `FileSystem.cs:211-217` |
@@ -193,7 +193,7 @@ Implementation: `src/EksimSafeCopy.Infrastructure/FileSystem.cs:192` `SecureTemp
 
 ## 11. Temp Cleanup Test Evidence
 
-Tests in `tests/EksimSafeCopy.Security.Tests/LocalOnlySecurityTests.cs`:
+Tests in `tests/SafeCopy.Security.Tests/LocalOnlySecurityTests.cs`:
 
 | Test | What it proves | Result |
 |------|---------------|--------|
@@ -206,7 +206,7 @@ Tests in `tests/EksimSafeCopy.Security.Tests/LocalOnlySecurityTests.cs`:
 Manual verification (developer):
 
 ```powershell
-$ws = [EksimSafeCopy.Infrastructure.SecureTempWorkspace]::new([EksimSafeCopy.Infrastructure.FileSystem]::new())
+$ws = [SafeCopy.Infrastructure.SecureTempWorkspace]::new([SafeCopy.Infrastructure.FileSystem]::new())
 $ws.RootPath; Test-Path $ws.RootPath  # True
 $ws.Dispose(); Test-Path $ws.RootPath # False
 ```
@@ -222,7 +222,7 @@ $ws.Dispose(); Test-Path $ws.RootPath # False
 - **Manual kill test (documented step):**
   1. Launch app, open large document (keep processing).
   2. Kill via Task Manager.
-  3. Verify `%TEMP%\EksimSafeCopy\{guid}` remains.
+  3. Verify `%TEMP%\SafeCopy\{guid}` remains.
   4. Relaunch app — observe directory gone (startup cleanup).
 
 **Status: PASS (automated + manual procedure documented)**
@@ -271,17 +271,17 @@ This test requires a human on a Windows 11 workstation with firewall UI. It prov
    ```powershell
    Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True -LogFileName "%SystemRoot%\System32\LogFiles\Firewall\pfirewall.log"
    # Optional: block outbound by default for the app
-   New-NetFirewallRule -DisplayName "EksimSafeCopy Block Outbound (Test)" -Direction Outbound -Program "C:\Program Files\Eksim SafeCopy\EksimSafeCopy.App.exe" -Action Block -Enabled True
+   New-NetFirewallRule -DisplayName "SafeCopy Block Outbound (Test)" -Direction Outbound -Program "C:\Program Files\SafeCopy\SafeCopy.App.exe" -Action Block -Enabled True
    ```
 2. Optionally disable adapter: `Get-NetAdapter | Disable-NetAdapter -Confirm:$false` is NOT needed; firewall block suffices.
 3. Steps:
-   - Launch Eksim SafeCopy.
+   - Launch SafeCopy.
    - Process a PDF, DOCX, XLSX, scanned image with OCR (Turkish).
    - Mask and verify.
 4. Observe:
    - App completes without error (no network required).
-   - `pfirewall.log` shows **no outbound entry** for `EksimSafeCopy.App.exe`.
-   - Remove test rule: `Remove-NetFirewallRule -DisplayName "EksimSafeCopy Block Outbound (Test)"`
+   - `pfirewall.log` shows **no outbound entry** for `SafeCopy.App.exe`.
+   - Remove test rule: `Remove-NetFirewallRule -DisplayName "SafeCopy Block Outbound (Test)"`
 
 **Expected:** No outbound connections; app functions offline.
 
@@ -294,7 +294,7 @@ This test requires a human on a Windows 11 workstation with firewall UI. It prov
 **Procedure:**
 
 1. Prepare clean Windows 11 VM (no internet).
-2. Install Eksim SafeCopy via offline installer (MSIX/MSI) — no download.
+2. Install SafeCopy via offline installer (MSIX/MSI) — no download.
 3. Disconnect network: `ipconfig /all` shows `Media disconnected` or Airplane mode ON.
 4. Verify initial state:
    ```powershell
@@ -365,10 +365,10 @@ No dependency pulls native updater or telemetry shim.
 ## 20. Test Execution Evidence
 
 ```powershell
-dotnet build tests/EksimSafeCopy.Security.Tests/EksimSafeCopy.Security.Tests.csproj --configuration Debug
+dotnet build tests/SafeCopy.Security.Tests/SafeCopy.Security.Tests.csproj --configuration Debug
 # Build: 0 Error, 0 Warning (no new NuGet added)
 
-dotnet vstest tests/EksimSafeCopy.Security.Tests/bin/Debug/net10.0-windows/EksimSafeCopy.Security.Tests.dll /Logger:Console
+dotnet vstest tests/SafeCopy.Security.Tests/bin/Debug/net10.0-windows/SafeCopy.Security.Tests.dll /Logger:Console
 # LocalOnlySecurityTests: 16/16 Passed (includes 13 mapped + 3 defense-in-depth)
 ```
 

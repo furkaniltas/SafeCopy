@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>1591;NU1603;NU1902;NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SafeCopy.Core\SafeCopy.Core.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.DocumentEngine\SafeCopy.DocumentEngine.csproj" />
+    <ProjectReference Include="..\..\src\SafeCopy.Infrastructure\SafeCopy.Infrastructure.csproj" />
+  </ItemGroup>
+
+<ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
+    <PackageReference Include="UglyToad.PdfPig.Core" Version="1.7.0-custom-5" />
+    <PackageReference Include="UglyToad.PdfPig.Fonts" Version="1.7.0-custom-5" />
+    <PackageReference Include="UglyToad.PdfPig.Tokenization" Version="1.7.0-custom-5" />
+    <PackageReference Include="UglyToad.PdfPig.Tokens" Version="1.7.0-custom-5" />
+  </ItemGroup>
+
+<ItemGroup>
+    <Using Include="SafeCopy.Core.Abstractions" />
+    <Using Include="DocumentFormat.OpenXml" Alias="OpenXmlFormat" />
+  </ItemGroup>
+</Project>

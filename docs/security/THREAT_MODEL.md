@@ -1,8 +1,8 @@
-# Eksim SafeCopy — Threat Model
+# SafeCopy — Threat Model
 
 ## System Overview
 
-Eksim SafeCopy is a Windows 11 desktop application that processes documents locally to detect and mask PII (Personally Identifiable Information) before users share documents with external AI services.
+SafeCopy is a Windows 11 desktop application that processes documents locally to detect and mask PII (Personally Identifiable Information) before users share documents with external AI services.
 
 **Trust Boundary:** User's local machine only. No network communication during normal operation.
 
@@ -137,7 +137,7 @@ All document parsing occurs in-process with no code execution capabilities. No s
 Every document validated for format compliance before deep processing. Size limits enforced at ingestion.
 
 ### SR-03: Temporary Workspace Security
-- Unique per-session directory under `%TEMP%\EksimSafeCopy\{guid}`
+- Unique per-session directory under `%TEMP%\SafeCopy\{guid}`
 - Directory ACL: Current user only
 - Automatic cleanup on normal exit, crash, and startup
 - No sensitive data written unencrypted
