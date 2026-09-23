@@ -173,4 +173,77 @@ public class SecretDetectorTests
             res.Value.Should().Contain(d=>d.Type==DetectionType.Secret, $"format {fmt} should detect Secret");
         }
     }
+
+    // Permanent regression for real-world false-negative (Phase 5)
+    [Theory]
+    [InlineData("Secret abcdefgh123")]
+    [InlineData("Secret=abcdefgh123")]
+    [InlineData("SECRET=abcdefgh123")]
+    [InlineData("API_KEY=abcdefgh123")]
+    [InlineData("CLIENT_SECRET=abcdefgh123")]
+    [InlineData("FALCON_CLIENT_SECRET=abcdefgh123")]
+    [InlineData("$env:FALCON_CLIENT_SECRET=\"abcdefgh123\"")]
+    [InlineData("export CLIENT_SECRET=\"abcdefgh123\"")]
+    [InlineData("\"client_secret\": \"abcdefgh123\"")]
+    [InlineData("PASSWORD=abcdefgh123")]
+    [InlineData("password: abcdefgh123")]
+    [InlineData("Şifre: abcdefgh123")]
+    public void Detect_RealWorld_Positive_ShouldBeSecret(string text)
+    {
+        var doc = Doc(text);
+        var res = _engine.Detect(doc);
+        res.Value.Should().Contain(d=>d.Type==DetectionType.Secret, $"{text} should be Secret");
+    }
+
+    [Theory]
+    [InlineData("Client ID abc123456789")]
+    [InlineData("FALCON_CLIENT_ID=\"abc123456789\"")]
+    [InlineData("Primary Key: 12345")]
+    [InlineData("Foreign Key: 12345")]
+    [InlineData("Record Key: 12345")]
+    [InlineData("Key ID: 12345")]
+    [InlineData("Key Management")]
+    [InlineData("API Documentation")]
+    [InlineData("API Description")]
+    [InlineData("API Endpoint")]
+    [InlineData("Token Validation")]
+    [InlineData("Password Policy")]
+    [InlineData("Secret Management")]
+    [InlineData("Key Information")]
+    public void Detect_RealWorld_Negative_ShouldNotBeSecret(string text)
+    {
+        var doc = Doc(text);
+        var res = _engine.Detect(doc);
+        res.Value.Should().NotContain(d=>d.Type==DetectionType.Secret, $"{text} should not be Secret");
+    }
+
+    [Fact]
+    public void Detect_RealWorld_SecretValue_28Dlvy()
+    {
+        // Synthetic, not production credential - regression for whitespace-separated Secret
+        var doc = Doc("Secret 28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li");
+        var res = _engine.Detect(doc);
+        res.Value.Should().ContainSingle(d=>d.Type==DetectionType.Secret && d.Value=="28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li");
+    }
+
+    [Fact]
+    public void Detect_Env_FalconClientSecret_Quoted()
+    {
+        var doc = Doc("$env:FALCON_CLIENT_SECRET=\"28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li\"");
+        var res = _engine.Detect(doc);
+        res.Value.Should().ContainSingle(d=>d.Type==DetectionType.Secret && d.Value=="28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li");
+    }
+
+    [Fact]
+    public void Detect_NoDuplicate_ForSameSpan()
+    {
+        var text = "Secret 28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li";
+        var doc = Doc(text);
+        var res = _engine.Detect(doc);
+        var secrets = res.Value.Where(d=>d.Type==DetectionType.Secret).ToList();
+        secrets.Should().ContainSingle(d=>d.Value=="28Dlvyob4OT6BjZEJwh7Gf3MC915tNQpKgXmu0Li");
+        // Ensure no duplicate overlapping for same occurrence
+        var distinctSpans = secrets.Select(d=>d.TextSpan?.StartIndex).Distinct().Count();
+        distinctSpans.Should().Be(secrets.Count);
+    }
 }

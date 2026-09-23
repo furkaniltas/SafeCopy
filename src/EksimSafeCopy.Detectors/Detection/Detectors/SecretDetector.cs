@@ -33,8 +33,14 @@ public sealed class SecretDetector : BaseDetector, ISecretDetector
         new Regex(@"(?:Connection\s+String|DB\s+Password|Database\s+Password)\s*[:=]\s*([^\n\r]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
         // 8. Env / config variables
         new Regex(@"\b(?:PASSWORD|PASSWD|PWD|API_KEY|SECRET_KEY|ACCESS_TOKEN|AUTH_TOKEN|CLIENT_SECRET)\s*[:=]\s*([^\s\n\r""'<>]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        // 8b. Any _SECRET with prefix (e.g., FALCON_CLIENT_SECRET) - capture value, not ID
+        new Regex(@"\b[A-Za-z0-9_]*SECRET[A-Za-z0-9_]*\s*=\s*""?([^""\s]+)""?", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        // 8c. PowerShell / export env syntax: $env:SECRET="value" or export SECRET="value"
+        new Regex(@"(?:\$env:)?(?:export\s+)?[A-Za-z0-9_]*SECRET[A-Za-z0-9_]*\s*=\s*""?([^""\s]+)""?", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        // 8d. Whitespace-separated Secret (e.g., "Secret 28Dlvy..." without : or =)
+        new Regex(@"\bSecret\s+([A-Za-z0-9\-_\.]{8,})", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
         // 9. JSON style "password": "value" - generic credential JSON
-        new Regex(@"""(?:password|şifre|sifre|parola|secret|apiKey|api_key|secret_key|token|access_token|private_key)""\s*:\s*""([^""]+)""", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"""(?:password|şifre|sifre|parola|secret|apiKey|api_key|secret_key|client_secret|token|access_token|private_key)""\s*:\s*""([^""]+)""", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
     };
 
     // False positive headers - if label is followed by these words without value, don't detect
