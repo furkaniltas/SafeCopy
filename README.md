@@ -29,14 +29,14 @@ Secret detection patterns (e.g., `FALCON_CLIENT_SECRET`) are technical and retai
 
 ## Supported Formats
 
-- **PDF** — ingestion via PdfPig; redaction currently unsupported via fallback (fails securely) due to true content-stream redaction limits with PdfSharp
+- **PDF** — text ingestion and PII detection via PdfPig; redaction is currently unsupported and fails securely without creating an output.
 - **DOCX** — DocumentFormat.OpenXml ingestion and redaction
-- **XLSX** — DocumentFormat.OpenXml ingestion and redaction including structured detectors
+- **XLSX** — DocumentFormat.OpenXml ingestion and redaction, including structured detectors
 - **TXT** — plain text ingestion and redaction
 - **UDF** — custom delimited format ingestion and redaction
 - **Images** — PNG/JPEG etc. via ImageSharp, with optional local OCR pre-processing
 
-All ingestion adapters produce the Common Document Model (`Document → DocumentPage → TextBlock → TextSpan`) — UI never depends on format internals.
+All supported ingestion adapters produce the Common Document Model (`Document → DocumentPage → TextBlock → TextSpan`).
 
 Flow: `Input → Document Adapter → Common Document Model → Detection Engine → Redaction/Planner → Renderer → Verification`
 
