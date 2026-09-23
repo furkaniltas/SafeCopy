@@ -135,5 +135,7 @@ See `SECURITY.md` for reporting, boundaries, and verification. For audits, see `
 
 ## License
 
-No `LICENSE` file is present in the repository at the time of rebrand. No license holder can be inferred — do not invent one. Add a `LICENSE` before public distribution and report its holder explicitly.
+MIT License — see `LICENSE`. Copyright (c) 2026 SafeCopy.
+
+SafeCopy is released under the MIT License, permitting use, copy, modification, distribution, and commercial use under the terms in `LICENSE`.
 
