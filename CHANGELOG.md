@@ -5,7 +5,7 @@ All notable changes to SafeCopy.
 ## [Unreleased]
 
 ### Changed
-- Rebranded from `EksimSafeCopy` to `SafeCopy` across solution, projects, namespaces, XAML, and documentation.
+- Project identity standardized as SafeCopy.
   - Solution: `SafeCopy.slnx`
   - Projects: `src/SafeCopy.*` (App, Core, DocumentEngine, Detectors, Ocr, Renderer, Infrastructure) and `tests/SafeCopy.*.Tests` (including Benchmark)
   - Namespaces: `SafeCopy.*` (`using`/`namespace`/`clr-namespace`/`x:Class`)

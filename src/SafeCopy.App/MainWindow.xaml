@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="SafeCopy" Width="1280" MinWidth="1024" MinHeight="700"
+        Title="SafeCopy" Width="1280" MinWidth="1024" MinHeight="600"
         Icon="Assets/Icons/SafeCopy.ico"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
@@ -37,7 +37,7 @@
                 </Border>
                 <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="SafeCopy" Foreground="White" FontSize="19" FontWeight="ExtraBold" LineHeight="20"/>
-                    <TextBlock Text="Secure PII Redaction — Local First" Foreground="{StaticResource SubtitleForeground}" FontSize="12.5" Opacity="0.95"/>
+                    <TextBlock Text="Hassas Veriler Güvende — Her Zaman Sizin Kontrolünüzde" Foreground="{StaticResource SubtitleForeground}" FontSize="12.5" Opacity="0.95"/>
                 </StackPanel>
             </StackPanel>
 
@@ -747,12 +747,12 @@
             </Grid>
         </Border>
 
-        <!-- Footer #FAFBFC - SafeCopy local-first -->
+        <!-- Footer #FAFBFC - SafeCopy -->
         <Grid Grid.Row="4" Background="{StaticResource FooterBackground}">
             <Border BorderBrush="{StaticResource BorderBrushLight}" BorderThickness="0,1,0,0"/>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,8">
                 <Ellipse Width="7" Height="7" Fill="{StaticResource PrimaryGreen}" VerticalAlignment="Center"/>
-                <TextBlock Text="SafeCopy — Local-first PII redaction" FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                <TextBlock Text="SafeCopy — Verilerinizi korur, güvenle paylaşmanızı sağlar." FontSize="11.5" Foreground="{StaticResource SecondaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
         </Grid>
     </Grid>

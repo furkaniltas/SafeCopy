@@ -47,8 +47,9 @@ Both must be `0 Error, 0 Warning` and `732/732` tests passing before any PR.
 
 ## Rebranding Notes
 
-- Namespace root is `SafeCopy` (not `EksimSafeCopy`).
+- Namespace root is `SafeCopy`.
 - Solution `SafeCopy.slnx`, projects `src/SafeCopy.*` and `tests/SafeCopy.*.Tests`.
 - Executable `SafeCopy.exe`, icon `Assets/Icons/SafeCopy.ico`, subtitle `Secure PII Redaction — Local First`.
 - Footer is `SafeCopy — Local-first PII redaction`; no company divisions.
+- Do not introduce legacy project names or branding.
 

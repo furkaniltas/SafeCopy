@@ -11,13 +11,10 @@
     <NoWarn>1591</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Icons\SafeCopy.ico</ApplicationIcon>
-    <AssemblyName>SafeCopy</AssemblyName>
+    <AssemblyName>SafeCopy.App</AssemblyName>
     <RootNamespace>SafeCopy.App</RootNamespace>
     <AssemblyTitle>SafeCopy</AssemblyTitle>
     <Product>SafeCopy</Product>
-    <Version>1.0.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
