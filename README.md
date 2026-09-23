@@ -11,6 +11,10 @@ Secure PII Redaction — Local First. A Windows 11 desktop application that dete
 - **Batch processing** — queue, progress, retry, and cancellation across multiple files
 - **Turkish PII focus** with extensible detector pipeline
 
+## Interface
+<img width="959" height="515" alt="image" src="https://github.com/user-attachments/assets/532a1cde-293f-4563-9961-3199c27fa426" />
+
+
 ## Supported Detection Types
 
 | Category | Types |
