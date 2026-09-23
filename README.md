@@ -1,6 +1,6 @@
 # SafeCopy
 
-Secure PII Redaction — Local First. A Windows 11 desktop application that detects and irreversibly masks personally identifiable information (PII) before documents are shared with external services. Fully offline, no cloud APIs, no telemetry.
+Secure PII Redaction — Local First. A Windows 11 desktop application that detects and irreversibly masks personally identifiable information (PII) before documents are shared with external services. Fully offline at runtime, with no cloud APIs or telemetry.
 
 ## Features
 
@@ -25,7 +25,7 @@ Secure PII Redaction — Local First. A Windows 11 desktop application that dete
 
 Detectors are independent components (`TcKimlikDetector`, `PhoneDetector`, `EmailDetector`, `IbanDetector`, `PersonNameDetector`, `AddressDetector`, `InstallationNumberDetector`/Tesisat, etc.) flowing through a common `Detection` model. Results include type, value, context, confidence, bounding box, and page number.
 
-Secret detection patterns (e.g., `FALCON_CLIENT_SECRET`) are technical and retained as-is.
+Secret detection supports technical patterns such as `FALCON_CLIENT_SECRET`; detected secret values are fully masked as `[SECRET]`.
 
 ## Supported Formats
 
@@ -84,7 +84,7 @@ Assets: `src/SafeCopy.App/Assets/Icons/SafeCopy.ico`
 
 ## Usage
 
-1. Launch SafeCopy (Title: **SafeCopy**, Subtitle: *Secure PII Redaction — Local First*).
+1. Launch SafeCopy (Title: **SafeCopy**, Subtitle: *Hassas Veriler Güvende — Her Zaman Sizin Kontrolünüzde*).
 2. **Dosya Seç** — pick a supported file.
 3. Review **Tespitler** (definite) and collapsible **Olası Kişisel Veriler** (medium confidence) — toggle selection.
 4. Choose **Maskeleme** mode: `FullRedaction`, `Placeholder`/`TypeLabel`, `PartialMask`.
