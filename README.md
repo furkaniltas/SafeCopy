@@ -23,25 +23,15 @@ Secure PII Redaction — Local First. A Windows 11 desktop application that dete
 
 ## Supported Detection Types
 
-| Category | Types |
-|---|---|
-| **Identity (Kimlik)** | `TcKimlikNo`, `TaxId`, `PassportNo`, `SgkNo` |
-| **Contact (İletişim)** | `Phone`, `Email`, `Address`, `FullName`, `FirstName`, `LastName`, `MotherName`, `FatherName`, `Username` |
-| **Financial (Finansal)** | `Iban`, `CreditCard`, `CardExpiry`, `Cvv` |
-| **Network (Ağ)** | `IpAddress`, `Url`, `MacAddress` |
-| **Utilities (Abonelik / Sayaç)** | `TesisatNo`, `AboneNo`, `SayacNo` |
-| **Legal / Customer (Hukuki / Müşteri)** | `MusteriNo`, `DosyaNo`, `DavaNo`, `LicensePlate`, `Date`, `BloodType` |
-| **Platform (Teknik / Platform)** | `Secret`, `PossiblePersonalData` (heuristic), structured XLSX field types |
-
-| Category | Types |
-|---|---|
-| Identity | `TcKimlikNo`, `TaxId`, `PassportNo`, `SgkNo` |
-| Contact | `Phone`, `Email`, `Address`, `FullName`, `FirstName`, `LastName`, `MotherName`, `FatherName`, `Username` |
-| Financial | `Iban`, `CreditCard`, `CardExpiry`, `Cvv` |
-| Network | `IpAddress`, `Url`, `MacAddress` |
-| Utilities | `TesisatNo`, `AboneNo`, `SayacNo` |
-| Legal / Customer | `MusteriNo`, `DosyaNo`, `DavaNo`, `LicensePlate`, `Date`, `BloodType` |
-| Platform | `Secret`, `PossiblePersonalData` (heuristic), structured XLSX field types |
+| Category (English) | Kategori (Türkçe) | Types |
+|---|---|---|
+| **Identity** | **Kimlik** | `TcKimlikNo`, `TaxId`, `PassportNo`, `SgkNo` |
+| **Contact** | **İletişim** | `Phone`, `Email`, `Address`, `FullName`, `FirstName`, `LastName`, `MotherName`, `FatherName`, `Username` |
+| **Financial** | **Finansal** | `Iban`, `CreditCard`, `CardExpiry`, `Cvv` |
+| **Network** | **Ağ** | `IpAddress`, `Url`, `MacAddress` |
+| **Utilities** | **Abonelik / Sayaç** | `TesisatNo`, `AboneNo`, `SayacNo` |
+| **Legal / Customer** | **Hukuki / Müşteri** | `MusteriNo`, `DosyaNo`, `DavaNo`, `LicensePlate`, `Date`, `BloodType` |
+| **Platform** | **Teknik / Platform** | `Secret`, `PossiblePersonalData` (heuristic), structured XLSX field types |
 
 Detectors are independent components (TcKimlikDetector, PhoneDetector, EmailDetector, IbanDetector, PersonNameDetector, AddressDetector, InstallationNumberDetector / Tesisat, etc.) flowing through a common Detection model. Results include type, value, context, confidence, bounding box, and page number.
 
