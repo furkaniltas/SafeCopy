@@ -25,6 +25,16 @@ Secure PII Redaction — Local First. A Windows 11 desktop application that dete
 
 | Category | Types |
 |---|---|
+| **Identity (Kimlik)** | `TcKimlikNo`, `TaxId`, `PassportNo`, `SgkNo` |
+| **Contact (İletişim)** | `Phone`, `Email`, `Address`, `FullName`, `FirstName`, `LastName`, `MotherName`, `FatherName`, `Username` |
+| **Financial (Finansal)** | `Iban`, `CreditCard`, `CardExpiry`, `Cvv` |
+| **Network (Ağ)** | `IpAddress`, `Url`, `MacAddress` |
+| **Utilities (Abonelik / Sayaç)** | `TesisatNo`, `AboneNo`, `SayacNo` |
+| **Legal / Customer (Hukuki / Müşteri)** | `MusteriNo`, `DosyaNo`, `DavaNo`, `LicensePlate`, `Date`, `BloodType` |
+| **Platform (Teknik / Platform)** | `Secret`, `PossiblePersonalData` (heuristic), structured XLSX field types |
+
+| Category | Types |
+|---|---|
 | Identity | `TcKimlikNo`, `TaxId`, `PassportNo`, `SgkNo` |
 | Contact | `Phone`, `Email`, `Address`, `FullName`, `FirstName`, `LastName`, `MotherName`, `FatherName`, `Username` |
 | Financial | `Iban`, `CreditCard`, `CardExpiry`, `Cvv` |
