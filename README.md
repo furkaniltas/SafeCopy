@@ -43,7 +43,7 @@ Secure PII Redaction — Local First. A Windows 11 desktop application that dete
 | Legal / Customer | `MusteriNo`, `DosyaNo`, `DavaNo`, `LicensePlate`, `Date`, `BloodType` |
 | Platform | `Secret`, `PossiblePersonalData` (heuristic), structured XLSX field types |
 
-Detectors are independent components (`TcKimlikDetector`, `PhoneDetector`, `EmailDetector`, `IbanDetector`, `PersonNameDetector`, `AddressDetector`, `InstallationNumberDetector`/Tesisat, etc.) flowing through a common `Detection` model. Results include type, value, context, confidence, bounding box, and page number.
+Detectors are independent components (TcKimlikDetector, PhoneDetector, EmailDetector, IbanDetector, PersonNameDetector, AddressDetector, InstallationNumberDetector / Tesisat, etc.) flowing through a common Detection model. Results include type, value, context, confidence, bounding box, and page number.
 
 Secret detection supports technical patterns such as `FALCON_CLIENT_SECRET`; detected secret values are fully masked as `[SECRET]`.
 
