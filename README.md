@@ -56,7 +56,7 @@ Flow: `Input → Document Adapter → Common Document Model → Detection Engine
 - **Temp workspace**: `%TEMP%\SafeCopy\{guid}` per session, ACL-restricted, cleanup on dispose, and stale-workspace recovery via `CleanupStaleWorkspaces`
 - **Original immutability**: SHA256 hash captured on load and verified; original file never overwritten
 - **Output verification**: `VerificationEngine` reloads output via `DocumentEngine` and re-runs detectors; residual PII → verification failure, no "Safe Copy Ready"
-- **Manual validation**: documented offline test and Windows Firewall outbound block test.
+- **Manual validation**: offline testing and Windows Firewall outbound block testing.
 
 ## Installation (.NET 10)
 
