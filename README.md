@@ -82,7 +82,7 @@ See `docs/security/` for full audits:
 
 ```powershell
 # Clone
-git clone <repo-url> SafeCopy
+git clone <https://github.com/furkaniltas/SafeCopy.git> SafeCopy
 cd SafeCopy
 
 # Restore & build
