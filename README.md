@@ -66,15 +66,7 @@ Flow: `Input → Document Adapter → Common Document Model → Detection Engine
 - **Temp workspace**: `%TEMP%\SafeCopy\{guid}` per session, ACL-restricted, deterministic cleanup on dispose/finalizer, stale-workspace reaper (`CleanupStaleWorkspaces`)
 - **Original immutability**: SHA256 hash captured on load and verified; original file never overwritten
 - **Output verification**: `VerificationEngine` reloads output via `DocumentEngine` and re-runs detectors; residual PII → verification failure, no "Safe Copy Ready"
-- **Manual validation**: documented offline test and Windows Firewall outbound block test (see `docs/security/LOCAL_ONLY_AUDIT.md`)
-
-See `docs/security/` for full audits:
-- `LOCAL_ONLY_AUDIT.md` — local-only guarantees, ACL, firewall/offline checks
-- `THREAT_MODEL.md` — threat model
-- `TEMP_WORKSPACE_SECURITY.md` — temp isolation
-- `ORIGINAL_IMMUTABILITY.md` — immutability guarantee
-- `OUTPUT_VERIFICATION.md` — mandatory verification
-- `OCR_ATTACK_SURFACE.md`, `ZIP_XML_ATTACK_SURFACE.md`
+- **Manual validation**: documented offline test and Windows Firewall outbound block test.
 
 ## Installation (.NET 10)
 
@@ -152,7 +144,7 @@ See `CONTRIBUTING.md`. Keep clean architecture (Core has no WPF/file-system/Wind
 
 ## Security
 
-See `SECURITY.md` for reporting, boundaries, and verification. For audits, see `docs/security/`.
+See `SECURITY.md` for reporting, boundaries, and verification.
 
 ## License
 

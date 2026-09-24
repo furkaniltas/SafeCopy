@@ -37,5 +37,5 @@ Every output is reloaded and re-scanned by the detection engine. If residual PII
 
 - Temp workspace is per-session GUID, ACL-restricted, disposed/finalized, with stale-workspace reaper.
 - Original file is never overwritten; hash is captured on load.
-- No network usage is expected; verify with Windows Firewall block and offline tests per `docs/security/LOCAL_ONLY_AUDIT.md`.
+- No network usage is expected; verify with Windows Firewall block and offline tests.
 
