@@ -1,6 +1,6 @@
 # SafeCopy
 
-Secure PII Redaction — Local First. A Windows 11 desktop application that detects and irreversibly masks personally identifiable information (PII) before documents are shared with external services. Fully offline at runtime, with no cloud APIs or telemetry.
+Secure PII Redaction — Local First. A Windows 11 desktop application that detects and masks personally identifiable information (PII) before documents are shared with external services.
 
 ## Features
 
@@ -63,7 +63,7 @@ Flow: `Input → Document Adapter → Common Document Model → Detection Engine
 ## Security Model
 
 - **Local-only**: verified zero outbound network calls; no HTTP/DNS usage at runtime; Windows.Media.Ocr reflection only (OS-bundled, no network)
-- **Temp workspace**: `%TEMP%\SafeCopy\{guid}` per session, ACL-restricted, deterministic cleanup on dispose/finalizer, stale-workspace reaper (`CleanupStaleWorkspaces`)
+- **Temp workspace**: `%TEMP%\SafeCopy\{guid}` per session, ACL-restricted, cleanup on dispose, and stale-workspace recovery via `CleanupStaleWorkspaces`
 - **Original immutability**: SHA256 hash captured on load and verified; original file never overwritten
 - **Output verification**: `VerificationEngine` reloads output via `DocumentEngine` and re-runs detectors; residual PII → verification failure, no "Safe Copy Ready"
 - **Manual validation**: documented offline test and Windows Firewall outbound block test.
@@ -74,7 +74,7 @@ Flow: `Input → Document Adapter → Common Document Model → Detection Engine
 
 ```powershell
 # Clone
-git clone <https://github.com/furkaniltas/SafeCopy.git> SafeCopy
+git clone https://github.com/furkaniltas/SafeCopy.git SafeCopy
 cd SafeCopy
 
 # Restore & build
@@ -87,7 +87,7 @@ dotnet run --project src/SafeCopy.App/SafeCopy.App.csproj -c Release
 # Application version: 1.0.0 (v1.0.0 release)
 ```
 
-Publish example (verified outside repo):
+Publish example:
 ```powershell
 dotnet publish src/SafeCopy.App/SafeCopy.App.csproj -c Release -o C:\Temp\SafeCopyRelease
 ```
@@ -116,11 +116,11 @@ Output → Reload via DocumentEngine → Re-run Detectors → Residual PII?
   → >0 residual (critical types like TcKimlikNo/Iban): Passed = false, blocked
 ```
 
-No safe-copy message without a verification pass. Metadata and hidden content are also checked/sanitized.
+Verification re-loads the generated output and re-runs the detection pipeline. Residual detectable PII causes verification to fail and blocks the safe-copy result.
 
 ## Privacy
 
-- No internet, no cloud OCR, no ChatGPT/Claude/Gemini/Copilot, no telemetry, no analytics, no remote config/logging, no CDN/fonts.
+- No cloud processing, external AI APIs, telemetry, analytics, remote configuration, CDN resources, or external OCR services.
 - Processing stays on-device; temp files under `%TEMP%\SafeCopy` and removed on clean exit; can be purged manually.
 - Only synthetic/anonymized test data is used (e.g., `Ahmet Yılmaz`, `11111111111`, `0532 000 00 00`, `TR00 0000 0000 0000 0000 0000 00`). Never commit real citizen data, `bin/`, `obj/`, `.vs/`, `TestResults/`, `temp/`, or PII.
 
@@ -140,7 +140,11 @@ No safe-copy message without a verification pass. Metadata and hidden content ar
 
 ## Contributing
 
-See `CONTRIBUTING.md`. Keep clean architecture (Core has no WPF/file-system/Windows API), run build + tests, use synthetic data only, and follow `AGENTS.md` phase gates.
+Contributions are welcome.
+
+Please keep the existing architecture intact, run the build and test suite before submitting changes, and use synthetic or anonymized test data only.
+
+For security vulnerabilities, please follow `SECURITY.md` instead of opening a public issue or discussion.
 
 ## Security
 
